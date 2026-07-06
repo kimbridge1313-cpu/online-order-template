@@ -329,16 +329,59 @@ export default function OrderPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-4 pb-32 lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:py-6 lg:pb-6">
-      <main className="space-y-4 lg:space-y-6">
-        <section className="card hidden p-5 lg:block"><p className="text-xs font-semibold text-accent">{env.storeName}</p><h1 className="mt-1 text-3xl font-black">訂餐頁</h1><div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-muted"><span>{isStore ? '門店櫃檯模式｜一段式快速點餐' : `${profile.name}，歡迎點餐`}</span><span>·</span><button className="underline" type="button" onClick={() => updateRole(isStore ? 'customer' : 'store')}>模板測試：切換為{isStore ? '顧客' : '門店'}帳號</button>{role !== 'owner' && <><span>·</span><button className="underline" type="button" onClick={() => updateRole('owner')}>切換為老闆帳號</button></>}</div></section>
-        {!isStore && <StoreSelector />}
-        <section className="space-y-4">
-          <div className="flex gap-2 overflow-auto pb-1">{categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${category === item ? 'bg-brand text-white' : 'bg-white text-muted'}`}>{item}</button>)}</div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">{visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact />)}</div>
-        </section>
+    <div className="mx-auto max-w-7xl px-0 py-0 pb-32 lg:px-4 lg:py-6 lg:pb-6">
+      <main className={isStore ? 'space-y-4 px-4 lg:space-y-6 lg:px-0 lg:grid lg:grid-cols-[1fr_360px] lg:gap-6' : 'space-y-0'}>
+        {isStore && (
+          <section className="card hidden p-5 lg:block lg:col-span-2">
+            <p className="text-xs font-semibold text-accent">{env.storeName}</p>
+            <h1 className="mt-1 text-3xl font-black">訂餐頁</h1>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-muted"><span>門店櫃檯模式｜一段式快速點餐</span><span>·</span><button className="underline" type="button" onClick={() => updateRole('customer')}>模板測試：切換為顧客帳號</button>{role !== 'owner' && <><span>·</span><button className="underline" type="button" onClick={() => updateRole('owner')}>切換為老闆帳號</button></>}</div>
+          </section>
+        )}
+
+        {!isStore && (
+          <section className="grid h-[calc(100vh-73px)] grid-cols-[116px_1fr] overflow-hidden bg-white lg:h-[calc(100vh-81px)] lg:rounded-3xl lg:border lg:border-line">
+            <aside className="overflow-y-auto border-r border-line bg-white pb-28">
+              <div className="sticky top-0 z-10 bg-white px-4 py-5 text-lg font-black text-ink">熱銷</div>
+              <div className="space-y-1 pb-4">
+                {categories.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setCategory(item)}
+                    className={`w-full border-l-2 px-4 py-5 text-left text-base font-semibold leading-7 transition ${category === item ? 'border-brand bg-cream text-ink' : 'border-transparent text-muted'}`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </aside>
+
+            <section className="overflow-y-auto pb-32">
+              <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 py-5 backdrop-blur">
+                <h2 className="text-xl font-black text-ink">{category}</h2>
+                {!isStore && selectedStore && <p className="mt-1 text-xs text-muted">{selectedStore.name}{storeLocationMessage ? `｜${storeLocationMessage}` : ''}</p>}
+              </div>
+              {!isStore && stores.length > 1 && <div className="px-4 pt-4"><StoreSelector /></div>}
+              <div className="divide-y divide-line px-2 py-3 sm:px-4">
+                {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} layout="list" />)}
+                {visibleProducts.length === 0 && <p className="p-8 text-center text-sm text-muted">此分類目前沒有商品。</p>}
+              </div>
+            </section>
+          </section>
+        )}
+
+        {isStore && (
+          <>
+            <section className="space-y-4">
+              <div className="flex gap-2 overflow-auto pb-1">{categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${category === item ? 'bg-brand text-white' : 'bg-white text-muted'}`}>{item}</button>)}</div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">{visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact />)}</div>
+            </section>
+            <div className="hidden space-y-4 lg:block"><OrderOptionsPanel /><CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={submitOrder} submitLabel="送出訂單" />{isStore && <label className="card block p-4 space-y-1"><span className="label">訂單備註</span><textarea className="input min-h-20" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} /></label>}</div>
+          </>
+        )}
       </main>
-      <div className="hidden lg:block space-y-4">{isStore && <OrderOptionsPanel />}<CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={isStore ? submitOrder : goCheckout} submitLabel={isStore ? '送出訂單' : '點餐完畢'} />{isStore && <label className="card block p-4 space-y-1"><span className="label">訂單備註</span><textarea className="input min-h-20" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} /></label>}</div>
+
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 p-3 shadow-soft backdrop-blur lg:hidden"><div className="mx-auto max-w-2xl">{mobileCartOpen && <div className="mb-3 max-h-[44vh] space-y-2 overflow-auto rounded-3xl border border-line bg-cream p-3">{cartItems.length === 0 && <p className="rounded-2xl bg-white p-4 text-sm text-muted">尚未加入商品。</p>}{cartItems.map((item, index) => <CartItemControls key={`${item.productId}-${index}`} item={item} index={index} onRemove={removeFromCart} onQuantityChange={updateCartQuantity} />)}</div>}<div className="flex items-center gap-3"><button className="flex min-w-0 flex-1 items-center justify-between rounded-2xl bg-cream px-4 py-3 text-left" type="button" onClick={() => setMobileCartOpen(!mobileCartOpen)}><span><span className="block text-xs font-semibold text-muted">購物車 {cartItems.length} 項</span><span className="block text-xl font-black text-brand">{formatPrice(cartTotal)}</span></span>{mobileCartOpen ? <ChevronDown size={20} /> : <ChevronUp size={20} />}</button><button className="btn-primary shrink-0" type="button" disabled={cartItems.length === 0} onClick={goCheckout}><ShoppingBag size={18} className="inline-block" /> {isStore ? '送出訂單' : '點餐完畢'}</button></div></div></div>
       {message && <p className="fixed bottom-24 left-4 right-4 z-50 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700 shadow-soft lg:static lg:mt-4">{message}</p>}
       {selectedProduct && <ProductOptionModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addToCart} />}
