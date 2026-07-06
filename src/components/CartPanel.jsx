@@ -1,15 +1,15 @@
 import { Trash2 } from 'lucide-react'
 import { calculateCartTotal, formatPrice } from '../utils/price'
 
-export default function CartPanel({ items, onRemove, onSubmit, disabled }) {
+export default function CartPanel({ items, onRemove, onSubmit, disabled, submitLabel = '送出訂單', title = '購物車', compact = false }) {
   const total = calculateCartTotal(items)
   return (
-    <aside className="card sticky bottom-4 p-4 safe-bottom lg:top-6 lg:bottom-auto">
+    <aside className={`card p-4 safe-bottom ${compact ? '' : 'sticky bottom-4 lg:top-6 lg:bottom-auto'}`}>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">購物車</h2>
+        <h2 className="text-lg font-bold">{title}</h2>
         <span className="text-sm text-muted">{items.length} 項</span>
       </div>
-      <div className="mt-4 max-h-72 space-y-3 overflow-auto">
+      <div className={`${compact ? 'mt-3 max-h-56' : 'mt-4 max-h-72'} space-y-3 overflow-auto`}>
         {items.length === 0 && <p className="rounded-2xl bg-cream p-4 text-sm text-muted">尚未加入商品。</p>}
         {items.map((item, index) => (
           <div key={`${item.productId}-${index}`} className="rounded-2xl border border-line bg-white p-3">
@@ -18,7 +18,7 @@ export default function CartPanel({ items, onRemove, onSubmit, disabled }) {
                 <p className="font-bold">{item.name} × {item.quantity}</p>
                 <p className="text-sm text-brand">{formatPrice(item.subtotal)}</p>
               </div>
-              <button className="rounded-xl p-2 text-red-600 hover:bg-red-50" type="button" onClick={() => onRemove(index)}><Trash2 size={18} /></button>
+              {onRemove && <button className="rounded-xl p-2 text-red-600 hover:bg-red-50" type="button" onClick={() => onRemove(index)}><Trash2 size={18} /></button>}
             </div>
             {item.selectedOptions?.length > 0 && (
               <ul className="mt-2 space-y-1 text-xs text-muted">
@@ -35,7 +35,7 @@ export default function CartPanel({ items, onRemove, onSubmit, disabled }) {
         <span className="font-bold">總金額</span>
         <span className="text-2xl font-black text-brand">{formatPrice(total)}</span>
       </div>
-      <button className="btn-primary mt-4 w-full" type="button" disabled={disabled || items.length === 0} onClick={onSubmit}>送出訂單</button>
+      <button className="btn-primary mt-4 w-full" type="button" disabled={disabled || items.length === 0} onClick={onSubmit}>{submitLabel}</button>
     </aside>
   )
 }
