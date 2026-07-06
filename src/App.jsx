@@ -1,15 +1,12 @@
-import { Component, useState } from 'react'
+import { Component, useMemo, useState } from 'react'
 import { ClipboardList, Menu, Package, ShoppingBag } from 'lucide-react'
 import OrderPage from './pages/OrderPage'
 import OrderManagementPage from './pages/OrderManagementPage'
 import ProductManagementPage from './pages/ProductManagementPage'
 import { env } from './config/env'
+import { readStorage } from './utils/storage'
 
-const navItems = [
-  { value: 'order', label: '訂餐頁', icon: ShoppingBag },
-  { value: 'orders', label: '訂單管理', icon: ClipboardList },
-  { value: 'products', label: '商品管理', icon: Package }
-]
+const ROLE_STORAGE_KEY = 'online-order-template-role'
 
 class AppErrorBoundary extends Component {
   constructor(props) {
@@ -48,7 +45,30 @@ class AppErrorBoundary extends Component {
 function AppShell() {
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
-  const CurrentPage = page === 'orders' ? OrderManagementPage : page === 'products' ? ProductManagementPage : OrderPage
+  const [role, setRole] = useState(() => readStorage(ROLE_STORAGE_KEY, 'customer'))
+  const isStore = role === 'store'
+
+  function refreshRole() {
+    const nextRole = readStorage(ROLE_STORAGE_KEY, 'customer')
+    setRole(nextRole)
+    if (nextRole !== 'store' && page === 'products') setPage('order')
+  }
+
+  const navItems = useMemo(() => {
+    if (isStore) {
+      return [
+        { value: 'order', label: '訂餐頁', icon: ShoppingBag },
+        { value: 'orders', label: '訂單管理', icon: ClipboardList },
+        { value: 'products', label: '商品管理', icon: Package }
+      ]
+    }
+    return [
+      { value: 'order', label: '訂餐頁', icon: ShoppingBag },
+      { value: 'orders', label: '我的訂單', icon: ClipboardList }
+    ]
+  }, [isStore])
+
+  const CurrentPage = page === 'orders' ? OrderManagementPage : page === 'products' && isStore ? ProductManagementPage : OrderPage
 
   return (
     <div className="min-h-screen">
@@ -63,7 +83,7 @@ function AppShell() {
             {navItems.map((item) => {
               const Icon = item.icon
               return (
-                <button key={item.value} onClick={() => setPage(item.value)} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
+                <button key={item.value} onClick={() => { refreshRole(); setPage(item.value) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
                   <Icon size={18} /> {item.label}
                 </button>
               )
@@ -75,7 +95,7 @@ function AppShell() {
             {navItems.map((item) => {
               const Icon = item.icon
               return (
-                <button key={item.value} onClick={() => { setPage(item.value); setOpen(false) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
+                <button key={item.value} onClick={() => { refreshRole(); setPage(item.value); setOpen(false) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
                   <Icon size={18} /> {item.label}
                 </button>
               )
@@ -83,7 +103,7 @@ function AppShell() {
           </nav>
         )}
       </header>
-      <CurrentPage />
+      <CurrentPage role={role} onRoleChange={refreshRole} />
     </div>
   )
 }
