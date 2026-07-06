@@ -363,9 +363,9 @@ export default function OrderPage() {
                 {!isStore && selectedStore && <p className="mt-1 text-xs text-muted">{selectedStore.name}{storeLocationMessage ? `｜${storeLocationMessage}` : ''}</p>}
               </div>
               {!isStore && stores.length > 1 && <div className="px-4 pt-4"><StoreSelector /></div>}
-              <div className="divide-y divide-line px-2 py-3 sm:px-4">
-                {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} layout="list" />)}
-                {visibleProducts.length === 0 && <p className="p-8 text-center text-sm text-muted">此分類目前沒有商品。</p>}
+              <div className="grid grid-cols-2 gap-2 px-2 py-3 sm:gap-3 sm:px-4">
+                {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact />)}
+                {visibleProducts.length === 0 && <p className="col-span-2 p-8 text-center text-sm text-muted">此分類目前沒有商品。</p>}
               </div>
             </section>
           </section>
@@ -382,7 +382,7 @@ export default function OrderPage() {
         )}
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 p-3 shadow-soft backdrop-blur lg:hidden"><div className="mx-auto max-w-2xl">{mobileCartOpen && <div className="mb-3 max-h-[44vh] space-y-2 overflow-auto rounded-3xl border border-line bg-cream p-3">{cartItems.length === 0 && <p className="rounded-2xl bg-white p-4 text-sm text-muted">尚未加入商品。</p>}{cartItems.map((item, index) => <CartItemControls key={`${item.productId}-${index}`} item={item} index={index} onRemove={removeFromCart} onQuantityChange={updateCartQuantity} />)}</div>}<div className="flex items-center gap-3"><button className="flex min-w-0 flex-1 items-center justify-between rounded-2xl bg-cream px-4 py-3 text-left" type="button" onClick={() => setMobileCartOpen(!mobileCartOpen)}><span><span className="block text-xs font-semibold text-muted">購物車 {cartItems.length} 項</span><span className="block text-xl font-black text-brand">{formatPrice(cartTotal)}</span></span>{mobileCartOpen ? <ChevronDown size={20} /> : <ChevronUp size={20} />}</button><button className="btn-primary shrink-0" type="button" disabled={cartItems.length === 0} onClick={goCheckout}><ShoppingBag size={18} className="inline-block" /> {isStore ? '送出訂單' : '點餐完畢'}</button></div></div></div>
+      <div className={`fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 p-3 shadow-soft backdrop-blur ${isStore ? 'lg:hidden' : ''}`}><div className="mx-auto max-w-2xl">{mobileCartOpen && <div className="mb-3 max-h-[44vh] space-y-2 overflow-auto rounded-3xl border border-line bg-cream p-3">{cartItems.length === 0 && <p className="rounded-2xl bg-white p-4 text-sm text-muted">尚未加入商品。</p>}{cartItems.map((item, index) => <CartItemControls key={`${item.productId}-${index}`} item={item} index={index} onRemove={removeFromCart} onQuantityChange={updateCartQuantity} />)}</div>}<div className="flex items-center gap-3"><button className="flex min-w-0 flex-1 items-center justify-between rounded-2xl bg-cream px-4 py-3 text-left" type="button" onClick={() => setMobileCartOpen(!mobileCartOpen)}><span><span className="block text-xs font-semibold text-muted">購物車 {cartItems.length} 項</span><span className="block text-xl font-black text-brand">{formatPrice(cartTotal)}</span></span>{mobileCartOpen ? <ChevronDown size={20} /> : <ChevronUp size={20} />}</button><button className="btn-primary shrink-0" type="button" disabled={cartItems.length === 0} onClick={goCheckout}><ShoppingBag size={18} className="inline-block" /> {isStore ? '送出訂單' : '點餐完畢'}</button></div></div></div>
       {message && <p className="fixed bottom-24 left-4 right-4 z-50 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700 shadow-soft lg:static lg:mt-4">{message}</p>}
       {selectedProduct && <ProductOptionModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addToCart} />}
     </div>
