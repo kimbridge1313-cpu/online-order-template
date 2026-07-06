@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Component, useState } from 'react'
 import { ClipboardList, Menu, Package, ShoppingBag } from 'lucide-react'
 import OrderPage from './pages/OrderPage'
 import OrderManagementPage from './pages/OrderManagementPage'
@@ -11,7 +11,41 @@ const navItems = [
   { value: 'products', label: '商品管理', icon: Package }
 ]
 
-export default function App() {
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidCatch(error, info) {
+    console.error('App render error:', error, info)
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen bg-cream px-4 py-10 text-ink">
+          <div className="mx-auto max-w-2xl rounded-3xl border border-red-200 bg-white p-6 shadow-soft">
+            <p className="text-xs font-bold text-red-600">系統啟動失敗</p>
+            <h1 className="mt-2 text-2xl font-black">頁面載入時發生錯誤</h1>
+            <p className="mt-3 text-sm text-muted">這通常是前端執行階段錯誤。請打開瀏覽器 Console 查看詳細訊息。</p>
+            <pre className="mt-4 overflow-auto rounded-2xl bg-red-50 p-4 text-xs text-red-800">
+              {this.state.error?.message || String(this.state.error)}
+            </pre>
+          </div>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
+function AppShell() {
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
   const CurrentPage = page === 'orders' ? OrderManagementPage : page === 'products' ? ProductManagementPage : OrderPage
@@ -51,5 +85,13 @@ export default function App() {
       </header>
       <CurrentPage />
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <AppErrorBoundary>
+      <AppShell />
+    </AppErrorBoundary>
   )
 }
