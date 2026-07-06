@@ -152,7 +152,7 @@ function AppShell() {
           </nav>
         )}
       </header>
-      <CurrentPage role={role} onRoleChange={refreshRole} />
+      <CurrentPage key={`${role}-${page}`} role={role} onRoleChange={refreshRole} />
     </div>
   )
 }
