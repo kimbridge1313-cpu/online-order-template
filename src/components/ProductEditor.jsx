@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import OptionGroupEditor from './OptionGroupEditor'
+import { compressProductImage, formatFileSize } from '../utils/imageUpload'
 
 const emptyProduct = {
   name: '',
@@ -7,6 +8,7 @@ const emptyProduct = {
   price: 0,
   description: '',
   imageUrl: '',
+  imageMeta: null,
   isAvailable: true,
   sortOrder: 999,
   optionGroups: []
@@ -15,9 +17,15 @@ const emptyProduct = {
 export default function ProductEditor({ product, categories = [], onCancel, onSave }) {
   const defaultCategory = categories[0] || '未分類'
   const [draft, setDraft] = useState(product || { ...emptyProduct, category: defaultCategory })
+  const [imageMessage, setImageMessage] = useState('')
+  const [imageError, setImageError] = useState('')
+  const [isCompressingImage, setIsCompressingImage] = useState(false)
 
   useEffect(() => {
     setDraft(product || { ...emptyProduct, category: defaultCategory })
+    setImageMessage('')
+    setImageError('')
+    setIsCompressingImage(false)
   }, [product, defaultCategory])
 
   function submit(event) {
@@ -28,6 +36,24 @@ export default function ProductEditor({ product, categories = [], onCancel, onSa
       price: Number(draft.price || 0),
       sortOrder: Number(draft.sortOrder || 999)
     })
+  }
+
+  async function handleImageUpload(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setImageError('')
+    setImageMessage('')
+    setIsCompressingImage(true)
+    try {
+      const result = await compressProductImage(file)
+      setDraft({ ...draft, imageUrl: result.imageUrl, imageMeta: result.imageMeta })
+      setImageMessage(`已壓縮：${formatFileSize(result.imageMeta.originalSize)} → ${formatFileSize(result.imageMeta.compressedSize)}`)
+    } catch (error) {
+      setImageError(error.message || '圖片上傳失敗。')
+    } finally {
+      setIsCompressingImage(false)
+    }
   }
 
   return (
@@ -53,6 +79,33 @@ export default function ProductEditor({ product, categories = [], onCancel, onSa
           <span className="label">排序</span>
           <input className="input" type="number" value={draft.sortOrder} onChange={(event) => setDraft({ ...draft, sortOrder: Number(event.target.value) })} />
         </label>
+
+        <section className="rounded-3xl border border-line bg-cream p-4 md:col-span-2">
+          <div className="grid gap-4 md:grid-cols-[180px_1fr]">
+            <div className="overflow-hidden rounded-2xl border border-line bg-white">
+              {draft.imageUrl ? (
+                <img className="aspect-square h-full w-full object-cover" src={draft.imageUrl} alt={draft.name || '商品圖片'} />
+              ) : (
+                <div className="flex aspect-square h-full w-full items-center justify-center p-4 text-center text-sm font-semibold text-muted">尚未上傳圖片</div>
+              )}
+            </div>
+            <div>
+              <h3 className="font-black">商品圖片</h3>
+              <p className="mt-1 text-xs leading-5 text-muted">請選擇小於 1MB 的 jpg、png 或 webp。上傳時會自動壓縮成 WebP 並儲存在商品資料。</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <label className="btn-secondary cursor-pointer">
+                  {isCompressingImage ? '壓縮中...' : '選擇圖片'}
+                  <input className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} disabled={isCompressingImage} />
+                </label>
+                {draft.imageUrl && <button className="btn-danger" type="button" onClick={() => setDraft({ ...draft, imageUrl: '', imageMeta: null })}>移除圖片</button>}
+              </div>
+              {imageMessage && <p className="mt-3 rounded-2xl bg-green-50 p-3 text-xs font-semibold text-green-700">{imageMessage}</p>}
+              {imageError && <p className="mt-3 rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700">{imageError}</p>}
+              {draft.imageMeta?.compressedSize && <p className="mt-3 text-xs text-muted">目前圖片：{formatFileSize(draft.imageMeta.compressedSize)}｜{draft.imageMeta.width} × {draft.imageMeta.height}</p>}
+            </div>
+          </div>
+        </section>
+
         <label className="flex items-center gap-2 text-sm font-semibold md:col-span-2">
           <input type="checkbox" checked={!!draft.isAvailable} onChange={(event) => setDraft({ ...draft, isAvailable: event.target.checked })} />
           商品上架
@@ -72,7 +125,7 @@ export default function ProductEditor({ product, categories = [], onCancel, onSa
       </div>
 
       <div className="mt-5 flex gap-2">
-        <button className="btn-primary" type="submit">儲存商品</button>
+        <button className="btn-primary" type="submit" disabled={isCompressingImage}>儲存商品</button>
         <button className="btn-secondary" type="button" onClick={onCancel}>取消</button>
       </div>
     </form>
