@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="線上訂餐系統">
+  <rect width="512" height="512" rx="112" fill="#F8F1E7"/>
+  <circle cx="256" cy="256" r="174" fill="#7A4B2A"/>
+  <path d="M157 228c0-54 44-98 99-98s99 44 99 98v24H157v-24Z" fill="#FFFFFF" opacity="0.96"/>
+  <path d="M145 252h222l-26 112a42 42 0 0 1-41 32h-88a42 42 0 0 1-41-32l-26-112Z" fill="#FFFFFF"/>
+  <path d="M184 291h144" stroke="#7A4B2A" stroke-width="24" stroke-linecap="round"/>
+  <path d="M204 338h104" stroke="#7A4B2A" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="356" cy="156" r="42" fill="#7FA37B"/>
+  <path d="M345 155h22M356 144v22" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+</svg>
