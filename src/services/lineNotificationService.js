@@ -45,11 +45,26 @@ export const lineNotificationService = {
         target: 'customer',
         lineUserId: order.customer?.lineUserId || '',
         title: '訂單已送出',
-        message: `你的訂單已送出。\n${summary}`,
+        message: `你的訂單已送出，待店家接單。\n${summary}`,
         status: 'queued_template_only',
         createdAt: now
       })
     ]
+  },
+
+  async notifyAcceptedOrder(order) {
+    const summary = buildOrderSummary(order)
+    const now = new Date().toISOString()
+    return saveNotification({
+      id: `line-customer-accepted-${Date.now()}`,
+      type: 'accepted_order_to_customer',
+      target: 'customer',
+      lineUserId: order.customer?.lineUserId || '',
+      title: '店家已接收訂單',
+      message: `店家已接收你的訂單。\n${summary}`,
+      status: 'queued_template_only',
+      createdAt: now
+    })
   },
 
   async notifyCancelledOrder(order) {
