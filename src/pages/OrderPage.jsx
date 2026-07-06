@@ -234,6 +234,25 @@ export default function OrderPage() {
     )
   }
 
+  function CustomerStoreHeader() {
+    if (stores.length === 0) return null
+    return (
+      <div>
+        <label className="sr-only" htmlFor="customer-store-select">下拉選擇門店</label>
+        <select
+          id="customer-store-select"
+          className="w-full appearance-none bg-transparent text-xl font-black text-ink outline-none"
+          value={selectedStoreId}
+          onChange={(event) => setSelectedStoreId(event.target.value)}
+        >
+          <option value="" disabled>下拉選擇門店</option>
+          {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+        </select>
+        {selectedStore && <p className="mt-1 text-xs text-muted">{selectedStore.name}{storeLocationMessage ? `｜${storeLocationMessage}` : ''}</p>}
+      </div>
+    )
+  }
+
   function OrderOptionsPanel() {
     return (
       <div className="space-y-3">
@@ -350,11 +369,9 @@ export default function OrderPage() {
             </aside>
 
             <section className="overflow-y-auto pb-32">
-              <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 py-5 backdrop-blur">
-                <h2 className="text-xl font-black text-ink">{category}</h2>
-                {!isStore && selectedStore && <p className="mt-1 text-xs text-muted">{selectedStore.name}{storeLocationMessage ? `｜${storeLocationMessage}` : ''}</p>}
+              <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 py-4 backdrop-blur">
+                <CustomerStoreHeader />
               </div>
-              {!isStore && stores.length > 1 && <div className="px-4 pt-4"><StoreSelector /></div>}
               <div className="grid grid-cols-2 gap-2 px-2 py-3 sm:gap-3 sm:px-4 md:grid-cols-3 xl:grid-cols-4">
                 {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact />)}
                 {visibleProducts.length === 0 && <p className="col-span-2 p-8 text-center text-sm text-muted md:col-span-3 xl:col-span-4">此分類目前沒有商品。</p>}
