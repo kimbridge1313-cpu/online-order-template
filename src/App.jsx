@@ -47,16 +47,16 @@ function AppShell() {
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
   const [role, setRole] = useState(() => readStorage(ROLE_STORAGE_KEY, 'customer'))
-  const isStore = role === 'store'
+  const isAdmin = role === 'store' || role === 'owner'
 
   function refreshRole() {
     const nextRole = readStorage(ROLE_STORAGE_KEY, 'customer')
     setRole(nextRole)
-    if (nextRole !== 'store' && (page === 'products' || page === 'settings')) setPage('order')
+    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings')) setPage('order')
   }
 
   const navItems = useMemo(() => {
-    if (isStore) {
+    if (isAdmin) {
       return [
         { value: 'order', label: '訂餐頁', icon: ShoppingBag },
         { value: 'orders', label: '訂單管理', icon: ClipboardList },
@@ -68,13 +68,13 @@ function AppShell() {
       { value: 'order', label: '訂餐頁', icon: ShoppingBag },
       { value: 'orders', label: '我的訂單', icon: ClipboardList }
     ]
-  }, [isStore])
+  }, [isAdmin])
 
   const CurrentPage = page === 'orders'
     ? OrderManagementPage
-    : page === 'products' && isStore
+    : page === 'products' && isAdmin
       ? ProductManagementPage
-      : page === 'settings' && isStore
+      : page === 'settings' && isAdmin
         ? StoreSettingsPage
         : OrderPage
 
