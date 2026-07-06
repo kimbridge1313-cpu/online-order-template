@@ -1,9 +1,10 @@
 import { Component, useEffect, useMemo, useState } from 'react'
-import { ClipboardList, Menu, Package, Settings, ShoppingBag } from 'lucide-react'
+import { Calculator, ClipboardList, Menu, Package, Settings, ShoppingBag } from 'lucide-react'
 import OrderPage from './pages/OrderPage'
 import OrderManagementPage from './pages/OrderManagementPage'
 import ProductManagementPage from './pages/ProductManagementPage'
 import StoreSettingsPage from './pages/StoreSettingsPage'
+import DailyClosingPage from './pages/DailyClosingPage'
 import { env } from './config/env'
 import { readStorage } from './utils/storage'
 
@@ -67,7 +68,7 @@ function AppShell() {
   function refreshRole() {
     const nextRole = readStorage(ROLE_STORAGE_KEY, 'customer')
     setRole(nextRole)
-    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings')) setPage('order')
+    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
   }
 
   const navItems = useMemo(() => {
@@ -75,6 +76,7 @@ function AppShell() {
       return [
         { value: 'order', label: '訂餐頁', icon: ShoppingBag },
         { value: 'orders', label: '訂單管理', icon: ClipboardList },
+        { value: 'closing', label: '每日結帳', icon: Calculator },
         { value: 'products', label: '商品管理', icon: Package },
         { value: 'settings', label: '設定', icon: Settings }
       ]
@@ -87,11 +89,13 @@ function AppShell() {
 
   const CurrentPage = page === 'orders'
     ? OrderManagementPage
-    : page === 'products' && isAdmin
-      ? ProductManagementPage
-      : page === 'settings' && isAdmin
-        ? StoreSettingsPage
-        : OrderPage
+    : page === 'closing' && isAdmin
+      ? DailyClosingPage
+      : page === 'products' && isAdmin
+        ? ProductManagementPage
+        : page === 'settings' && isAdmin
+          ? StoreSettingsPage
+          : OrderPage
 
   return (
     <div className="min-h-screen">
