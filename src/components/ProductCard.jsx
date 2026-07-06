@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react'
 import { formatPrice } from '../utils/price'
 
-export default function ProductCard({ product, onSelect, compact = false, layout = 'grid' }) {
+export default function ProductCard({ product, onSelect, compact = false, layout = 'grid', dense = false }) {
   if (layout === 'list') {
     return (
       <button
@@ -36,6 +36,12 @@ export default function ProductCard({ product, onSelect, compact = false, layout
     )
   }
 
+  const imageHeight = dense ? 'h-24 md:h-32' : compact ? 'h-28 md:h-36' : 'h-44'
+  const bodyPadding = dense ? 'p-2.5' : compact ? 'p-3' : 'p-5'
+  const titleClass = dense ? 'mt-0.5 text-sm leading-tight' : compact ? 'mt-1 text-base' : 'mt-1 text-lg'
+  const priceClass = dense ? 'mt-1 text-base' : 'mt-2 text-lg'
+  const plusClass = dense ? 'right-2 top-2 h-8 w-8 rounded-xl' : 'right-3 top-3 h-9 w-9 rounded-2xl'
+
   return (
     <button
       type="button"
@@ -45,27 +51,27 @@ export default function ProductCard({ product, onSelect, compact = false, layout
       <div className="relative bg-cream">
         {product.imageUrl ? (
           <img
-            className={`${compact ? 'h-28 md:h-36' : 'h-44'} w-full object-cover`}
+            className={`${imageHeight} w-full object-cover`}
             src={product.imageUrl}
             alt={product.name}
             loading="lazy"
           />
         ) : (
-          <div className={`${compact ? 'h-28 md:h-36' : 'h-44'} flex w-full items-center justify-center bg-cream px-4 text-center text-sm font-bold text-muted`}>
+          <div className={`${imageHeight} flex w-full items-center justify-center bg-cream px-3 text-center text-xs font-bold text-muted`}>
             {product.category || '商品圖片'}
           </div>
         )}
-        <span className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-2xl bg-white/90 text-brand shadow-soft">
-          <Plus size={18} />
+        <span className={`absolute flex items-center justify-center bg-white/90 text-brand shadow-soft ${plusClass}`}>
+          <Plus size={dense ? 16 : 18} />
         </span>
       </div>
 
-      <div className={compact ? 'p-3' : 'p-5'}>
-        <div className="text-xs font-semibold text-accent">{product.category}</div>
-        <h3 className={`${compact ? 'mt-1 text-base' : 'mt-1 text-lg'} font-bold text-ink`}>{product.name}</h3>
-        {!compact && <p className="mt-2 line-clamp-2 text-sm text-muted">{product.description || '可客製化點餐選項'}</p>}
-        <p className="mt-2 text-lg font-bold text-brand">{formatPrice(product.price)}</p>
-        {!product.isAvailable && <div className="mt-3 text-sm font-semibold text-red-600">已下架</div>}
+      <div className={bodyPadding}>
+        <div className="text-[11px] font-semibold text-accent">{product.category}</div>
+        <h3 className={`${titleClass} font-bold text-ink`}>{product.name}</h3>
+        {!compact && !dense && <p className="mt-2 line-clamp-2 text-sm text-muted">{product.description || '可客製化點餐選項'}</p>}
+        <p className={`${priceClass} font-bold text-brand`}>{formatPrice(product.price)}</p>
+        {!product.isAvailable && <div className="mt-2 text-xs font-semibold text-red-600">已下架</div>}
       </div>
     </button>
   )
