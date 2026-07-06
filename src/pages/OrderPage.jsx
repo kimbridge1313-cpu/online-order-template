@@ -236,13 +236,13 @@ export default function OrderPage() {
 
   function OrderOptionsPanel() {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {!isStore && <StoreSelector />}
-        <section className="card p-4">
+        <section className={isStore ? 'card p-3' : 'card p-4'}>
           <h2 className="font-black">用餐方式</h2>
-          <div className="mt-3"><DiningTypeSelector value={diningType} onChange={setDiningType} /></div>
+          <div className="mt-2"><DiningTypeSelector value={diningType} onChange={setDiningType} /></div>
           {storeSettings.tableNumberEnabled && (
-            <label className="mt-4 block space-y-1">
+            <label className="mt-3 block space-y-1">
               <span className="label">桌號</span>
               <select className="input" value={tableNumber} onChange={(event) => setTableNumber(event.target.value)}>
                 <option value="">請選擇桌號</option>
@@ -250,20 +250,20 @@ export default function OrderPage() {
               </select>
             </label>
           )}
-          <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
+          <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
             <input type="checkbox" checked={bagging} onChange={(event) => setBagging(event.target.checked)} />
             需要打包
           </label>
         </section>
 
-        <section className="card p-4">
+        <section className={isStore ? 'card p-3' : 'card p-4'}>
           <h2 className="font-black">用餐 / 取餐時間</h2>
-          <div className="mt-3 grid grid-cols-2 gap-2 rounded-3xl bg-cream p-2">
-            <button className={`rounded-2xl px-4 py-3 text-sm font-bold ${timeType === 'now' ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setTimeType('now')}>立即</button>
-            <button className={`rounded-2xl px-4 py-3 text-sm font-bold ${timeType === 'scheduled' ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setTimeType('scheduled')}>預定</button>
+          <div className="mt-2 grid grid-cols-2 gap-2 rounded-3xl bg-cream p-1.5">
+            <button className={`rounded-2xl px-3 py-2.5 text-sm font-bold ${timeType === 'now' ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setTimeType('now')}>立即</button>
+            <button className={`rounded-2xl px-3 py-2.5 text-sm font-bold ${timeType === 'scheduled' ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setTimeType('scheduled')}>預定</button>
           </div>
           {timeType === 'scheduled' && (
-            <div className="mt-4 grid gap-3">
+            <div className="mt-3 grid gap-2">
               <label className="space-y-1"><span className="label">日期 *</span><input className="input" type="date" value={orderDate} onChange={(event) => setOrderDate(event.target.value)} /></label>
               <label className="space-y-1"><span className="label">時間 *</span><input className="input" type="time" value={orderTime} onChange={(event) => setOrderTime(event.target.value)} /></label>
             </div>
@@ -329,8 +329,8 @@ export default function OrderPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-0 py-0 pb-32 lg:px-4 lg:py-6 lg:pb-6">
-      <main className={isStore ? 'space-y-4 px-4 lg:space-y-6 lg:px-0 lg:grid lg:grid-cols-[1fr_360px] lg:gap-6' : 'space-y-0'}>
+    <div className="mx-auto max-w-7xl px-0 py-0 pb-32 lg:px-3 lg:py-4 lg:pb-4">
+      <main className={isStore ? 'space-y-3 px-3 lg:space-y-4 lg:px-0 lg:grid lg:grid-cols-[1fr_330px] lg:gap-4' : 'space-y-0'}>
         {!isStore && (
           <section className="grid h-[calc(100vh-73px)] grid-cols-[116px_1fr] overflow-hidden bg-white lg:h-[calc(100vh-81px)] lg:rounded-3xl lg:border lg:border-line">
             <aside className="overflow-y-auto border-r border-line bg-white pb-28">
@@ -365,11 +365,11 @@ export default function OrderPage() {
 
         {isStore && (
           <>
-            <section className="space-y-4">
-              <div className="flex gap-2 overflow-auto pb-1">{categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${category === item ? 'bg-brand text-white' : 'bg-white text-muted'}`}>{item}</button>)}</div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">{visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact />)}</div>
+            <section className="space-y-3">
+              <div className="flex gap-1.5 overflow-auto pb-0.5">{categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${category === item ? 'bg-brand text-white' : 'bg-white text-muted'}`}>{item}</button>)}</div>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">{visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact dense />)}</div>
             </section>
-            <div className="hidden space-y-4 lg:block"><OrderOptionsPanel /><CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={submitOrder} submitLabel="送出訂單" />{isStore && <label className="card block p-4 space-y-1"><span className="label">訂單備註</span><textarea className="input min-h-20" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} /></label>}</div>
+            <div className="hidden space-y-3 lg:block"><OrderOptionsPanel /><CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={submitOrder} submitLabel="送出訂單" compact />{isStore && <label className="card block space-y-1 p-3"><span className="label">訂單備註</span><textarea className="input min-h-16" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} /></label>}</div>
           </>
         )}
       </main>
