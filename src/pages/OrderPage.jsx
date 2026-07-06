@@ -54,7 +54,7 @@ export default function OrderPage() {
   const [isLineLoggedIn, setIsLineLoggedIn] = useState(() => readStorage(MOCK_LINE_LOGIN_KEY, false))
   const [profile, setProfile] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
   const [profileDraft, setProfileDraft] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
-  const [storeSettings, setStoreSettings] = useState(() => readStorage(STORE_SETTINGS_KEY, { tableNumberEnabled: false }))
+  const [storeSettings] = useState(() => readStorage(STORE_SETTINGS_KEY, { tableNumberEnabled: false }))
   const [products, setProducts] = useState([])
   const [category, setCategory] = useState('全部')
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -94,12 +94,6 @@ export default function OrderPage() {
       writeStorage(MOCK_LINE_LOGIN_KEY, true)
       setCheckoutStep('ordering')
     }
-  }
-
-  function updateStoreSettings(nextSettings) {
-    setStoreSettings(nextSettings)
-    writeStorage(STORE_SETTINGS_KEY, nextSettings)
-    if (!nextSettings.tableNumberEnabled) setTableNumber('')
   }
 
   function mockLineLogin() {
@@ -187,24 +181,9 @@ export default function OrderPage() {
     setCheckoutStep('ordering')
   }
 
-  function OrderOptionsPanel({ showSettings = false }) {
+  function OrderOptionsPanel() {
     return (
       <div className="space-y-4">
-        {showSettings && (
-          <section className="card p-4">
-            <h2 className="font-black">門店設定</h2>
-            <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
-              <input
-                type="checkbox"
-                checked={!!storeSettings.tableNumberEnabled}
-                onChange={(event) => updateStoreSettings({ ...storeSettings, tableNumberEnabled: event.target.checked })}
-              />
-              啟用桌號
-            </label>
-            <p className="mt-2 text-xs text-muted">關閉後，門店點餐不會顯示桌號欄位。</p>
-          </section>
-        )}
-
         <section className="card p-4">
           <h2 className="font-black">用餐方式</h2>
           <div className="mt-3">
@@ -360,7 +339,7 @@ export default function OrderPage() {
       </main>
 
       <div className="hidden lg:block space-y-4">
-        {isStore && <OrderOptionsPanel showSettings />}
+        {isStore && <OrderOptionsPanel />}
         <CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={isStore ? submitOrder : goCheckout} submitLabel={isStore ? '送出訂單' : '點餐完畢'} />
         {isStore && (
           <label className="card block p-4 space-y-1">
