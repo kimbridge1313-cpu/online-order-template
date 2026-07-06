@@ -239,16 +239,19 @@ export default function OrderPage() {
     return (
       <div>
         <label className="sr-only" htmlFor="customer-store-select">下拉選擇門店</label>
-        <select
-          id="customer-store-select"
-          className="w-full appearance-none bg-transparent text-xl font-black text-ink outline-none"
-          value={selectedStoreId}
-          onChange={(event) => setSelectedStoreId(event.target.value)}
-        >
-          <option value="" disabled>下拉選擇門店</option>
-          {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
-        </select>
-        {selectedStore && <p className="mt-1 text-xs text-muted">{selectedStore.name}{storeLocationMessage ? `｜${storeLocationMessage}` : ''}</p>}
+        <div className="relative rounded-2xl bg-cream px-3 py-2 pr-10">
+          <select
+            id="customer-store-select"
+            className="w-full appearance-none bg-transparent text-base font-black text-ink outline-none"
+            value={selectedStoreId}
+            onChange={(event) => setSelectedStoreId(event.target.value)}
+          >
+            <option value="" disabled>下拉選擇門店</option>
+            {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-brand" size={18} />
+        </div>
+        {selectedStore && <p className="mt-1.5 text-[11px] leading-4 text-muted">{selectedStore.name}{storeLocationMessage ? `｜${storeLocationMessage}` : ''}</p>}
       </div>
     )
   }
@@ -351,16 +354,16 @@ export default function OrderPage() {
     <div className="mx-auto max-w-7xl px-0 py-0 pb-32 lg:px-3 lg:py-4 lg:pb-4">
       <main className={isStore ? 'space-y-3 px-3 lg:space-y-4 lg:px-0 lg:grid lg:grid-cols-[1fr_330px] lg:gap-4' : 'space-y-0'}>
         {!isStore && (
-          <section className="grid h-[calc(100vh-73px)] grid-cols-[116px_1fr] overflow-hidden bg-white lg:h-[calc(100vh-81px)] lg:rounded-3xl lg:border lg:border-line">
+          <section className="grid h-[calc(100vh-73px)] grid-cols-[104px_1fr] overflow-hidden bg-white lg:h-[calc(100vh-81px)] lg:rounded-3xl lg:border lg:border-line">
             <aside className="overflow-y-auto border-r border-line bg-white pb-28">
-              <div className="sticky top-0 z-10 bg-white px-4 py-5 text-lg font-black text-ink">熱銷</div>
-              <div className="space-y-1 pb-4">
+              <div className="sticky top-0 z-10 bg-white px-3 py-4 text-base font-black text-ink">熱銷</div>
+              <div className="space-y-0.5 pb-4">
                 {categories.map((item) => (
                   <button
                     key={item}
                     type="button"
                     onClick={() => setCategory(item)}
-                    className={`w-full border-l-2 px-4 py-5 text-left text-base font-semibold leading-7 transition ${category === item ? 'border-brand bg-cream text-ink' : 'border-transparent text-muted'}`}
+                    className={`w-full border-l-2 px-3 py-4 text-left text-sm font-semibold leading-6 transition ${category === item ? 'border-brand bg-cream text-ink' : 'border-transparent text-muted'}`}
                   >
                     {item}
                   </button>
@@ -369,11 +372,11 @@ export default function OrderPage() {
             </aside>
 
             <section className="overflow-y-auto pb-32">
-              <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 py-4 backdrop-blur">
+              <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-3 py-3 backdrop-blur">
                 <CustomerStoreHeader />
               </div>
-              <div className="grid grid-cols-2 gap-2 px-2 py-3 sm:gap-3 sm:px-4 md:grid-cols-3 xl:grid-cols-4">
-                {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact />)}
+              <div className="grid grid-cols-2 gap-2 px-2 py-2.5 sm:gap-2.5 sm:px-3 md:grid-cols-3 xl:grid-cols-4">
+                {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact dense />)}
                 {visibleProducts.length === 0 && <p className="col-span-2 p-8 text-center text-sm text-muted md:col-span-3 xl:col-span-4">此分類目前沒有商品。</p>}
               </div>
             </section>
