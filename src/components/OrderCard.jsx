@@ -1,10 +1,10 @@
 import StatusBadge from './StatusBadge'
 import { formatPrice } from '../utils/price'
 
-const diningLabels = { dine_in: '內用', takeaway: '外帶自取', preorder: '預訂單' }
+const diningLabels = { dine_in: '內用', takeaway: '自取', preorder: '預訂單' }
 const sourceLabels = { customer_online: '客人線上訂餐', counter: '店家櫃檯點餐' }
 
-export default function OrderCard({ order, onStatusChange, onEdit, onCancel }) {
+export default function OrderCard({ order, onStatusChange, onEdit, onCancel, readonly = false }) {
   return (
     <article className={`card p-4 ${order.status === 'cancelled' ? 'opacity-60' : ''}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -47,13 +47,15 @@ export default function OrderCard({ order, onStatusChange, onEdit, onCancel }) {
         <span className="text-2xl font-black text-brand">{formatPrice(order.totalAmount)}</span>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {order.status === 'pending' && <button className="btn-secondary py-2" onClick={() => onStatusChange(order.id, 'accepted')}>接單</button>}
-        {order.status !== 'cancelled' && order.status !== 'completed' && <button className="btn-secondary py-2" onClick={() => onStatusChange(order.id, 'preparing')}>製作中</button>}
-        {order.status !== 'cancelled' && <button className="btn-secondary py-2" onClick={() => onStatusChange(order.id, 'completed')}>完成</button>}
-        {order.status !== 'cancelled' && <button className="btn-secondary py-2" onClick={() => onEdit(order)}>修改</button>}
-        {order.status !== 'cancelled' && <button className="btn-danger py-2" onClick={() => onCancel(order.id)}>退單</button>}
-      </div>
+      {!readonly && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {order.status === 'pending' && <button className="btn-secondary py-2" onClick={() => onStatusChange(order.id, 'accepted')}>接單</button>}
+          {order.status !== 'cancelled' && order.status !== 'completed' && <button className="btn-secondary py-2" onClick={() => onStatusChange(order.id, 'preparing')}>製作中</button>}
+          {order.status !== 'cancelled' && <button className="btn-secondary py-2" onClick={() => onStatusChange(order.id, 'completed')}>完成</button>}
+          {order.status !== 'cancelled' && <button className="btn-secondary py-2" onClick={() => onEdit(order)}>修改</button>}
+          {order.status !== 'cancelled' && <button className="btn-danger py-2" onClick={() => onCancel(order.id)}>退單</button>}
+        </div>
+      )}
     </article>
   )
 }
