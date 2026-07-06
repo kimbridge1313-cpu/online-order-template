@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import OptionGroupEditor from './OptionGroupEditor'
 
 const emptyProduct = {
   name: '',
-  category: '飲品',
+  category: '',
   price: 0,
   description: '',
   imageUrl: '',
@@ -12,12 +12,22 @@ const emptyProduct = {
   optionGroups: []
 }
 
-export default function ProductEditor({ product, onCancel, onSave }) {
-  const [draft, setDraft] = useState(product || emptyProduct)
+export default function ProductEditor({ product, categories = [], onCancel, onSave }) {
+  const defaultCategory = categories[0] || '未分類'
+  const [draft, setDraft] = useState(product || { ...emptyProduct, category: defaultCategory })
+
+  useEffect(() => {
+    setDraft(product || { ...emptyProduct, category: defaultCategory })
+  }, [product, defaultCategory])
 
   function submit(event) {
     event.preventDefault()
-    onSave(draft)
+    onSave({
+      ...draft,
+      category: draft.category || defaultCategory,
+      price: Number(draft.price || 0),
+      sortOrder: Number(draft.sortOrder || 999)
+    })
   }
 
   return (
@@ -30,11 +40,14 @@ export default function ProductEditor({ product, onCancel, onSave }) {
         </label>
         <label className="space-y-1">
           <span className="label">分類</span>
-          <input className="input" value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} />
+          <select className="input" value={draft.category || defaultCategory} onChange={(event) => setDraft({ ...draft, category: event.target.value })}>
+            {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+            {!categories.includes(draft.category) && draft.category && <option value={draft.category}>{draft.category}</option>}
+          </select>
         </label>
         <label className="space-y-1">
           <span className="label">價格</span>
-          <input className="input" type="number" value={draft.price} onChange={(event) => setDraft({ ...draft, price: Number(event.target.value) })} />
+          <input className="input" type="number" min="0" value={draft.price} onChange={(event) => setDraft({ ...draft, price: Number(event.target.value) })} />
         </label>
         <label className="space-y-1">
           <span className="label">排序</span>
