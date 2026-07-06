@@ -22,7 +22,7 @@ export const mockOrderService = {
       ...payload,
       id: `order-${Date.now()}`,
       orderNumber: createOrderNumber(),
-      status: 'pending',
+      status: payload.source === 'counter' ? 'accepted' : 'pending',
       createdAt: now,
       updatedAt: now
     }
@@ -37,6 +37,14 @@ export const mockOrderService = {
     )
     saveAll(next)
     return next.find((order) => order.id === orderId)
+  },
+  async acceptOrder(orderId) {
+    const order = await this.updateOrder(orderId, {
+      status: 'accepted',
+      acceptedAt: new Date().toISOString()
+    })
+    if (order && order.source === 'customer_online') await lineNotificationService.notifyAcceptedOrder(order)
+    return order
   },
   async cancelOrder(orderId, cancelReason = '') {
     const order = await this.updateOrder(orderId, {
