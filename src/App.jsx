@@ -6,7 +6,7 @@ import ProductManagementPage from './pages/ProductManagementPage'
 import StoreSettingsPage from './pages/StoreSettingsPage'
 import DailyClosingPage from './pages/DailyClosingPage'
 import { env } from './config/env'
-import { readStorage } from './utils/storage'
+import { readStorage, writeStorage } from './utils/storage'
 
 const ROLE_STORAGE_KEY = 'online-order-template-role'
 const STORE_SETTINGS_KEY = 'online-order-template-store-settings'
@@ -65,6 +65,13 @@ function AppShell() {
     }
   }, [])
 
+  function switchRole(nextRole) {
+    writeStorage(ROLE_STORAGE_KEY, nextRole)
+    setRole(nextRole)
+    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
+    if (nextRole === 'store' || nextRole === 'owner') setPage('order')
+  }
+
   function refreshRole() {
     const nextRole = readStorage(ROLE_STORAGE_KEY, 'customer')
     setRole(nextRole)
@@ -100,25 +107,40 @@ function AppShell() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-line bg-cream/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-          <div>
-            <p className="text-xs font-semibold text-accent">{brandName}</p>
-            <h1 className="text-lg font-black text-ink">{env.appName}</h1>
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold text-accent">{brandName}</p>
+            <h1 className="truncate text-lg font-black text-ink">{env.appName}</h1>
+          </div>
+          <div className="hidden items-center gap-2 md:flex">
+            <select className="rounded-2xl border border-line bg-white px-3 py-3 text-sm font-bold text-ink" value={role} onChange={(event) => switchRole(event.target.value)} aria-label="模板身份切換">
+              <option value="customer">顧客</option>
+              <option value="store">門店</option>
+              <option value="owner">老闆</option>
+            </select>
+            <nav className="flex gap-2">
+              {navItems.map((item) => {
+                const Icon = item.icon
+                return (
+                  <button key={item.value} onClick={() => { refreshRole(); setPage(item.value) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
+                    <Icon size={18} /> {item.label}
+                  </button>
+                )
+              })}
+            </nav>
           </div>
           <button className="rounded-2xl bg-white p-3 md:hidden" onClick={() => setOpen(!open)} type="button"><Menu size={20} /></button>
-          <nav className="hidden gap-2 md:flex">
-            {navItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <button key={item.value} onClick={() => { refreshRole(); setPage(item.value) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
-                  <Icon size={18} /> {item.label}
-                </button>
-              )
-            })}
-          </nav>
         </div>
         {open && (
           <nav className="grid gap-2 border-t border-line px-4 py-3 md:hidden">
+            <label className="space-y-1">
+              <span className="text-xs font-bold text-muted">模板身份</span>
+              <select className="input" value={role} onChange={(event) => switchRole(event.target.value)}>
+                <option value="customer">顧客</option>
+                <option value="store">門店</option>
+                <option value="owner">老闆</option>
+              </select>
+            </label>
             {navItems.map((item) => {
               const Icon = item.icon
               return (
