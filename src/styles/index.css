@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #1f2933;
+  background: #fffaf1;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+}
+
+body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, #fffaf1 0%, #f7efe3 100%); }
+button, input, select, textarea { font: inherit; }
+
+.safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+.card { @apply rounded-3xl border border-line bg-white/90 shadow-soft; }
+.btn-primary { @apply rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-brandDark disabled:cursor-not-allowed disabled:opacity-40; }
+.btn-secondary { @apply rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:bg-cream; }
+.btn-danger { @apply rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700; }
+.input { @apply w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm outline-none focus:border-brand; }
+.label { @apply text-xs font-semibold tracking-wide text-muted; }
