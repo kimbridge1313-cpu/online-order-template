@@ -1,0 +1,21 @@
+{
+  "name": "線上訂餐系統",
+  "short_name": "訂餐系統",
+  "description": "門店 POS 與顧客線上訂餐系統",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F8F1E7",
+  "theme_color": "#7A4B2A",
+  "lang": "zh-Hant-TW",
+  "categories": ["food", "business", "productivity"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
