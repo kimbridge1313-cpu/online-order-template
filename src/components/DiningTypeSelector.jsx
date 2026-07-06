@@ -1,12 +1,11 @@
 const diningTypes = [
   { value: 'dine_in', label: '內用' },
-  { value: 'takeaway', label: '外帶自取' },
-  { value: 'preorder', label: '預訂單' }
+  { value: 'takeaway', label: '自取' }
 ]
 
 export default function DiningTypeSelector({ value, onChange }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-2 gap-2">
       {diningTypes.map((item) => (
         <button
           key={item.value}
