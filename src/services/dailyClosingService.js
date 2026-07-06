@@ -3,13 +3,6 @@ import { orderService } from './orderService'
 
 const STORAGE_KEY = 'online-order-template-daily-closings'
 
-export const paymentLabels = {
-  cash: '現金',
-  linePay: 'LINE Pay',
-  card: '信用卡',
-  other: '其他'
-}
-
 function list() {
   return readStorage(STORAGE_KEY, [])
 }
@@ -34,14 +27,6 @@ function isSameStore(order, storeId) {
 function summarizeOrders(orders) {
   const activeOrders = orders.filter((order) => order.status !== 'cancelled')
   const cancelledOrders = orders.filter((order) => order.status === 'cancelled')
-  const paymentSummary = { cash: 0, linePay: 0, card: 0, other: 0 }
-
-  activeOrders.forEach((order) => {
-    const paymentMethod = order.paymentMethod || 'cash'
-    const key = paymentSummary[paymentMethod] === undefined ? 'other' : paymentMethod
-    paymentSummary[key] += Number(order.totalAmount || 0)
-  })
-
   const grossSales = orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)
   const cancelledAmount = cancelledOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)
   const netSales = activeOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)
@@ -58,9 +43,23 @@ function summarizeOrders(orders) {
     cancelledAmount,
     netSales,
     averageOrderAmount,
-    paymentSummary,
-    cashExpected: paymentSummary.cash
+    cashBaseAmount: netSales
   }
+}
+
+function normalizeManualAdjustments(items = []) {
+  return items
+    .map((item) => ({
+      id: item.id || `adjustment-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: item.name || '手動對帳項目',
+      amount: Number(item.amount || 0),
+      note: item.note || ''
+    }))
+    .filter((item) => item.name || item.amount)
+}
+
+function sumManualAdjustments(items = []) {
+  return normalizeManualAdjustments(items).reduce((sum, item) => sum + Number(item.amount || 0), 0)
 }
 
 export const dailyClosingService = {
@@ -81,8 +80,11 @@ export const dailyClosingService = {
     }
   },
 
-  async closeDay({ businessDate, storeId = 'all', storeName = '全部門店', cashActual = 0, note = '', closedBy = '門店帳號' }) {
+  async closeDay({ businessDate, storeId = 'all', storeName = '全部門店', cashActual = 0, manualAdjustments = [], note = '', closedBy = '門店帳號' }) {
     const summary = await this.getSummary({ businessDate, storeId })
+    const normalizedAdjustments = normalizeManualAdjustments(manualAdjustments)
+    const manualAdjustmentTotal = sumManualAdjustments(normalizedAdjustments)
+    const cashExpected = Math.max(0, summary.cashBaseAmount - manualAdjustmentTotal)
     const now = new Date().toISOString()
     const record = {
       id: `closing-${businessDate}-${storeId}`,
@@ -99,10 +101,12 @@ export const dailyClosingService = {
       cancelledAmount: summary.cancelledAmount,
       netSales: summary.netSales,
       averageOrderAmount: summary.averageOrderAmount,
-      paymentSummary: summary.paymentSummary,
-      cashExpected: summary.cashExpected,
+      cashBaseAmount: summary.cashBaseAmount,
+      manualAdjustments: normalizedAdjustments,
+      manualAdjustmentTotal,
+      cashExpected,
       cashActual: Number(cashActual || 0),
-      cashDifference: Number(cashActual || 0) - summary.cashExpected,
+      cashDifference: Number(cashActual || 0) - cashExpected,
       status: 'closed',
       note,
       closedBy,
