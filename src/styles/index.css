@@ -19,6 +19,24 @@ input, select, textarea { box-sizing: border-box; }
   .btn-secondary { @apply rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:bg-cream; }
   .btn-danger { @apply rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700; }
   .input { @apply block w-full min-w-0 max-w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm outline-none focus:border-brand; }
-  .date-input { @apply block w-full min-w-0 max-w-full appearance-none truncate rounded-2xl border border-line bg-white px-3 py-3 text-[13px] leading-none outline-none focus:border-brand; }
+  .input[type='date'], .input[type='time'], .input[type='datetime-local'] { @apply min-w-0 max-w-full appearance-none truncate px-2.5 text-[12px] leading-none; }
+  .input[type='number'] { @apply min-w-0 max-w-full appearance-none px-3; }
+  .date-input { @apply block w-full min-w-0 max-w-full appearance-none truncate rounded-2xl border border-line bg-white px-2.5 py-3 text-[12px] leading-none outline-none focus:border-brand; }
   .label { @apply text-xs font-semibold tracking-wide text-muted; }
+}
+
+@layer utilities {
+  .input[type='date']::-webkit-date-and-time-value,
+  .input[type='time']::-webkit-date-and-time-value,
+  .date-input::-webkit-date-and-time-value {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .input[type='date']::-webkit-calendar-picker-indicator,
+  .input[type='time']::-webkit-calendar-picker-indicator,
+  .date-input::-webkit-calendar-picker-indicator {
+    margin-left: 0;
+    padding: 0;
+  }
 }
