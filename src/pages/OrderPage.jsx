@@ -363,9 +363,9 @@ export default function OrderPage() {
                 {!isStore && selectedStore && <p className="mt-1 text-xs text-muted">{selectedStore.name}{storeLocationMessage ? `｜${storeLocationMessage}` : ''}</p>}
               </div>
               {!isStore && stores.length > 1 && <div className="px-4 pt-4"><StoreSelector /></div>}
-              <div className="grid grid-cols-2 gap-2 px-2 py-3 sm:gap-3 sm:px-4">
+              <div className="grid grid-cols-2 gap-2 px-2 py-3 sm:gap-3 sm:px-4 md:grid-cols-3 xl:grid-cols-4">
                 {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact />)}
-                {visibleProducts.length === 0 && <p className="col-span-2 p-8 text-center text-sm text-muted">此分類目前沒有商品。</p>}
+                {visibleProducts.length === 0 && <p className="col-span-2 p-8 text-center text-sm text-muted md:col-span-3 xl:col-span-4">此分類目前沒有商品。</p>}
               </div>
             </section>
           </section>
