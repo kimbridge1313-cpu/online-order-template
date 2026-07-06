@@ -15,12 +15,6 @@ const MOCK_ROLE_KEY = 'online-order-template-role'
 const MOCK_LINE_LOGIN_KEY = 'online-order-template-line-login'
 const STORE_SETTINGS_KEY = 'online-order-template-store-settings'
 const STORE_LIST_KEY = 'online-order-template-store-list'
-const paymentOptions = [
-  { value: 'cash', label: '現金' },
-  { value: 'linePay', label: 'LINE Pay' },
-  { value: 'card', label: '信用卡' },
-  { value: 'other', label: '其他' }
-]
 const defaultStores = [
   { id: 'demo-store', name: '示範門店', accountName: 'demo-store-account', latitude: 23.6978, longitude: 120.9605, address: '示範地址', isActive: true }
 ]
@@ -86,7 +80,6 @@ export default function OrderPage() {
   const [mobileCartOpen, setMobileCartOpen] = useState(false)
   const [checkoutStep, setCheckoutStep] = useState('ordering')
   const [diningType, setDiningType] = useState('dine_in')
-  const [paymentMethod, setPaymentMethod] = useState('cash')
   const [bagging, setBagging] = useState(false)
   const [timeType, setTimeType] = useState('now')
   const [orderDate, setOrderDate] = useState(getTodayDate())
@@ -202,13 +195,11 @@ export default function OrderPage() {
         lineDisplayName: isStore ? '' : profile.name
       },
       diningType,
-      paymentMethod,
       pickupTime: getScheduledTime(),
       items: cartItems,
       totalAmount: calculateCartTotal(cartItems),
       note: [
         selectedStore ? `門店：${selectedStore.name}` : '',
-        `付款：${paymentOptions.find((item) => item.value === paymentMethod)?.label || '現金'}`,
         timeType === 'now' ? '時間：立即' : `時間：${orderDate} ${orderTime}`,
         storeSettings.tableNumberEnabled && tableNumber ? `桌號：${tableNumber}` : '',
         bagging ? '需要打包' : '不需打包',
@@ -219,7 +210,6 @@ export default function OrderPage() {
     setCartItems([])
     setNote('')
     setTableNumber('')
-    setPaymentMethod('cash')
     setBagging(false)
     setTimeType('now')
     setOrderDate(getTodayDate())
@@ -264,15 +254,6 @@ export default function OrderPage() {
             <input type="checkbox" checked={bagging} onChange={(event) => setBagging(event.target.checked)} />
             需要打包
           </label>
-        </section>
-
-        <section className="card p-4">
-          <h2 className="font-black">付款方式</h2>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {paymentOptions.map((item) => (
-              <button key={item.value} className={`rounded-2xl border px-3 py-3 text-sm font-bold ${paymentMethod === item.value ? 'border-brand bg-brand text-white' : 'border-line bg-white text-ink'}`} type="button" onClick={() => setPaymentMethod(item.value)}>{item.label}</button>
-            ))}
-          </div>
         </section>
 
         <section className="card p-4">
