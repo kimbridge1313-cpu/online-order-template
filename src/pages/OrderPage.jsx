@@ -13,9 +13,40 @@ import { readStorage, writeStorage } from '../utils/storage'
 const CUSTOMER_PROFILE_KEY = 'online-order-template-customer-profile'
 const MOCK_ROLE_KEY = 'online-order-template-role'
 const MOCK_LINE_LOGIN_KEY = 'online-order-template-line-login'
+const STORE_SETTINGS_KEY = 'online-order-template-store-settings'
 
 function getTodayDate() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function CartItemControls({ item, index, onRemove, onQuantityChange }) {
+  return (
+    <div className="rounded-2xl border border-line bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-ink">{item.name}</p>
+          {item.selectedOptions?.length > 0 && (
+            <ul className="mt-1 space-y-0.5 text-xs text-muted">
+              {item.selectedOptions.map((option) => (
+                <li key={`${option.groupId}-${option.optionId}`}>{option.groupName}：{option.optionName}{option.priceDelta > 0 ? ` +${formatPrice(option.priceDelta)}` : ''}</li>
+              ))}
+            </ul>
+          )}
+          {item.note && <p className="mt-1 text-xs text-muted">備註：{item.note}</p>}
+        </div>
+        <button className="rounded-xl p-2 text-red-600 hover:bg-red-50" type="button" onClick={() => onRemove(index)} aria-label="刪除商品"><Trash2 size={18} /></button>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="font-black text-brand">{formatPrice(item.subtotal)}</p>
+        <div className="flex items-center gap-2">
+          <button className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-white" type="button" onClick={() => onQuantityChange(index, item.quantity - 1)} aria-label="減少數量"><Minus size={16} /></button>
+          <span className="w-7 text-center font-bold">{item.quantity}</span>
+          <button className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-white" type="button" onClick={() => onQuantityChange(index, item.quantity + 1)} aria-label="增加數量"><Plus size={16} /></button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function OrderPage() {
@@ -23,6 +54,7 @@ export default function OrderPage() {
   const [isLineLoggedIn, setIsLineLoggedIn] = useState(() => readStorage(MOCK_LINE_LOGIN_KEY, false))
   const [profile, setProfile] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
   const [profileDraft, setProfileDraft] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
+  const [storeSettings, setStoreSettings] = useState(() => readStorage(STORE_SETTINGS_KEY, { tableNumberEnabled: false }))
   const [products, setProducts] = useState([])
   const [category, setCategory] = useState('全部')
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -34,6 +66,7 @@ export default function OrderPage() {
   const [timeType, setTimeType] = useState('now')
   const [orderDate, setOrderDate] = useState(getTodayDate())
   const [orderTime, setOrderTime] = useState('')
+  const [tableNumber, setTableNumber] = useState('')
   const [note, setNote] = useState('')
   const [message, setMessage] = useState('')
   const [successOrder, setSuccessOrder] = useState(null)
@@ -59,7 +92,14 @@ export default function OrderPage() {
     if (nextRole === 'store') {
       setIsLineLoggedIn(true)
       writeStorage(MOCK_LINE_LOGIN_KEY, true)
+      setCheckoutStep('ordering')
     }
+  }
+
+  function updateStoreSettings(nextSettings) {
+    setStoreSettings(nextSettings)
+    writeStorage(STORE_SETTINGS_KEY, nextSettings)
+    if (!nextSettings.tableNumberEnabled) setTableNumber('')
   }
 
   function mockLineLogin() {
@@ -99,6 +139,7 @@ export default function OrderPage() {
   function goCheckout() {
     setMessage('')
     if (cartItems.length === 0) return setMessage('請先加入商品。')
+    if (isStore) return submitOrder()
     setMobileCartOpen(false)
     setCheckoutStep('checkout')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -130,6 +171,7 @@ export default function OrderPage() {
       totalAmount: calculateCartTotal(cartItems),
       note: [
         timeType === 'now' ? '時間：立即' : `時間：${orderDate} ${orderTime}`,
+        storeSettings.tableNumberEnabled && tableNumber ? `桌號：${tableNumber}` : '',
         bagging ? '需要打包' : '不需打包',
         note ? `備註：${note}` : ''
       ].filter(Boolean).join('｜')
@@ -137,11 +179,70 @@ export default function OrderPage() {
     setSuccessOrder(order)
     setCartItems([])
     setNote('')
+    setTableNumber('')
     setBagging(false)
     setTimeType('now')
     setOrderDate(getTodayDate())
     setOrderTime('')
     setCheckoutStep('ordering')
+  }
+
+  function OrderOptionsPanel({ showSettings = false }) {
+    return (
+      <div className="space-y-4">
+        {showSettings && (
+          <section className="card p-4">
+            <h2 className="font-black">門店設定</h2>
+            <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={!!storeSettings.tableNumberEnabled}
+                onChange={(event) => updateStoreSettings({ ...storeSettings, tableNumberEnabled: event.target.checked })}
+              />
+              啟用桌號
+            </label>
+            <p className="mt-2 text-xs text-muted">關閉後，門店點餐不會顯示桌號欄位。</p>
+          </section>
+        )}
+
+        <section className="card p-4">
+          <h2 className="font-black">用餐方式</h2>
+          <div className="mt-3">
+            <DiningTypeSelector value={diningType} onChange={setDiningType} />
+          </div>
+          {storeSettings.tableNumberEnabled && (
+            <label className="mt-4 block space-y-1">
+              <span className="label">桌號</span>
+              <input className="input" placeholder="例如：A3、12、吧台 2" value={tableNumber} onChange={(event) => setTableNumber(event.target.value)} />
+            </label>
+          )}
+          <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" checked={bagging} onChange={(event) => setBagging(event.target.checked)} />
+            需要打包
+          </label>
+        </section>
+
+        <section className="card p-4">
+          <h2 className="font-black">用餐 / 取餐時間</h2>
+          <div className="mt-3 grid grid-cols-2 gap-2 rounded-3xl bg-cream p-2">
+            <button className={`rounded-2xl px-4 py-3 text-sm font-bold ${timeType === 'now' ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setTimeType('now')}>立即</button>
+            <button className={`rounded-2xl px-4 py-3 text-sm font-bold ${timeType === 'scheduled' ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setTimeType('scheduled')}>預定</button>
+          </div>
+          {timeType === 'scheduled' && (
+            <div className="mt-4 grid gap-3">
+              <label className="space-y-1">
+                <span className="label">日期 *</span>
+                <input className="input" type="date" value={orderDate} onChange={(event) => setOrderDate(event.target.value)} />
+              </label>
+              <label className="space-y-1">
+                <span className="label">時間 *</span>
+                <input className="input" type="time" value={orderTime} onChange={(event) => setOrderTime(event.target.value)} />
+              </label>
+            </div>
+          )}
+        </section>
+      </div>
+    )
   }
 
   if (!isStore && !isLineLoggedIn) {
@@ -197,7 +298,7 @@ export default function OrderPage() {
     )
   }
 
-  if (checkoutStep === 'checkout') {
+  if (!isStore && checkoutStep === 'checkout') {
     return (
       <div className="mx-auto grid max-w-5xl gap-6 px-4 py-6 lg:grid-cols-[1fr_360px]">
         <main className="space-y-5">
@@ -207,48 +308,15 @@ export default function OrderPage() {
             <p className="mt-2 text-sm text-muted">確認用餐方式、用餐 / 取餐時間與訂單聯絡資料。</p>
           </section>
 
-          <section className="card p-5">
-            <h2 className="font-black">用餐方式</h2>
-            <div className="mt-3">
-              <DiningTypeSelector value={diningType} onChange={setDiningType} />
-            </div>
-            <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
-              <input type="checkbox" checked={bagging} onChange={(event) => setBagging(event.target.checked)} />
-              需要打包
-            </label>
-          </section>
-
-          <section className="card p-5">
-            <h2 className="font-black">用餐 / 取餐時間</h2>
-            <div className="mt-3 grid grid-cols-2 gap-2 rounded-3xl bg-cream p-2">
-              <button className={`rounded-2xl px-4 py-3 text-sm font-bold ${timeType === 'now' ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setTimeType('now')}>立即</button>
-              <button className={`rounded-2xl px-4 py-3 text-sm font-bold ${timeType === 'scheduled' ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setTimeType('scheduled')}>預定</button>
-            </div>
-            {timeType === 'scheduled' && (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1">
-                  <span className="label">日期 *</span>
-                  <input className="input" type="date" value={orderDate} onChange={(event) => setOrderDate(event.target.value)} />
-                </label>
-                <label className="space-y-1">
-                  <span className="label">時間 *</span>
-                  <input className="input" type="time" value={orderTime} onChange={(event) => setOrderTime(event.target.value)} />
-                </label>
-              </div>
-            )}
-          </section>
+          <OrderOptionsPanel />
 
           <section className="card p-5">
             <h2 className="font-black">訂單聯絡資料</h2>
-            {isStore ? (
-              <p className="mt-2 text-sm text-muted">門店櫃檯訂單，不需填寫顧客資料。</p>
-            ) : (
-              <div className="mt-3 rounded-2xl bg-cream p-4 text-sm">
-                <p className="font-bold">{profile.name}</p>
-                <p className="mt-1 text-muted">{profile.phone}</p>
-                <p className="mt-2 text-xs text-muted">資料僅限訂單聯絡使用。</p>
-              </div>
-            )}
+            <div className="mt-3 rounded-2xl bg-cream p-4 text-sm">
+              <p className="font-bold">{profile.name}</p>
+              <p className="mt-1 text-muted">{profile.phone}</p>
+              <p className="mt-2 text-xs text-muted">資料僅限訂單聯絡使用。</p>
+            </div>
             <label className="mt-4 block space-y-1">
               <span className="label">訂單備註</span>
               <textarea className="input min-h-24" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} />
@@ -273,7 +341,7 @@ export default function OrderPage() {
           <p className="text-xs font-semibold text-accent">{env.storeName}</p>
           <h1 className="mt-1 text-3xl font-black">訂餐頁</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-muted">
-            <span>{isStore ? '門店櫃檯模式' : `${profile.name}，歡迎點餐`}</span>
+            <span>{isStore ? '門店櫃檯模式｜一段式快速點餐' : `${profile.name}，歡迎點餐`}</span>
             <span>·</span>
             <button className="underline" type="button" onClick={() => updateRole(isStore ? 'customer' : 'store')}>模板測試：切換為{isStore ? '顧客' : '門店'}帳號</button>
           </div>
@@ -291,8 +359,15 @@ export default function OrderPage() {
         </section>
       </main>
 
-      <div className="hidden lg:block">
-        <CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={goCheckout} submitLabel="點餐完畢" />
+      <div className="hidden lg:block space-y-4">
+        {isStore && <OrderOptionsPanel showSettings />}
+        <CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={isStore ? submitOrder : goCheckout} submitLabel={isStore ? '送出訂單' : '點餐完畢'} />
+        {isStore && (
+          <label className="card block p-4 space-y-1">
+            <span className="label">訂單備註</span>
+            <textarea className="input min-h-20" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} />
+          </label>
+        )}
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 p-3 shadow-soft backdrop-blur lg:hidden">
@@ -301,31 +376,7 @@ export default function OrderPage() {
             <div className="mb-3 max-h-[44vh] space-y-2 overflow-auto rounded-3xl border border-line bg-cream p-3">
               {cartItems.length === 0 && <p className="rounded-2xl bg-white p-4 text-sm text-muted">尚未加入商品。</p>}
               {cartItems.map((item, index) => (
-                <div key={`${item.productId}-${index}`} className="rounded-2xl border border-line bg-white p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-ink">{item.name}</p>
-                      {item.selectedOptions?.length > 0 && (
-                        <ul className="mt-1 space-y-0.5 text-xs text-muted">
-                          {item.selectedOptions.map((option) => (
-                            <li key={`${option.groupId}-${option.optionId}`}>{option.groupName}：{option.optionName}{option.priceDelta > 0 ? ` +${formatPrice(option.priceDelta)}` : ''}</li>
-                          ))}
-                        </ul>
-                      )}
-                      {item.note && <p className="mt-1 text-xs text-muted">備註：{item.note}</p>}
-                    </div>
-                    <button className="rounded-xl p-2 text-red-600 hover:bg-red-50" type="button" onClick={() => removeFromCart(index)} aria-label="刪除商品"><Trash2 size={18} /></button>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <p className="font-black text-brand">{formatPrice(item.subtotal)}</p>
-                    <div className="flex items-center gap-2">
-                      <button className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-white" type="button" onClick={() => updateCartQuantity(index, item.quantity - 1)} aria-label="減少數量"><Minus size={16} /></button>
-                      <span className="w-7 text-center font-bold">{item.quantity}</span>
-                      <button className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-white" type="button" onClick={() => updateCartQuantity(index, item.quantity + 1)} aria-label="增加數量"><Plus size={16} /></button>
-                    </div>
-                  </div>
-                </div>
+                <CartItemControls key={`${item.productId}-${index}`} item={item} index={index} onRemove={removeFromCart} onQuantityChange={updateCartQuantity} />
               ))}
             </div>
           )}
@@ -339,7 +390,7 @@ export default function OrderPage() {
               {mobileCartOpen ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
             </button>
             <button className="btn-primary shrink-0" type="button" disabled={cartItems.length === 0} onClick={goCheckout}>
-              <ShoppingBag size={18} className="inline-block" /> 點餐完畢
+              <ShoppingBag size={18} className="inline-block" /> {isStore ? '送出訂單' : '點餐完畢'}
             </button>
           </div>
         </div>
