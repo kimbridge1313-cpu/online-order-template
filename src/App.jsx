@@ -1,4 +1,4 @@
-import { Component, useMemo, useState } from 'react'
+import { Component, useEffect, useMemo, useState } from 'react'
 import { ClipboardList, Menu, Package, Settings, ShoppingBag } from 'lucide-react'
 import OrderPage from './pages/OrderPage'
 import OrderManagementPage from './pages/OrderManagementPage'
@@ -8,6 +8,7 @@ import { env } from './config/env'
 import { readStorage } from './utils/storage'
 
 const ROLE_STORAGE_KEY = 'online-order-template-role'
+const STORE_SETTINGS_KEY = 'online-order-template-store-settings'
 
 class AppErrorBoundary extends Component {
   constructor(props) {
@@ -47,7 +48,21 @@ function AppShell() {
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
   const [role, setRole] = useState(() => readStorage(ROLE_STORAGE_KEY, 'customer'))
+  const [storeSettings, setStoreSettings] = useState(() => readStorage(STORE_SETTINGS_KEY, { brandName: env.storeName }))
   const isAdmin = role === 'store' || role === 'owner'
+  const brandName = storeSettings?.brandName || env.storeName
+
+  useEffect(() => {
+    function refreshSettings() {
+      setStoreSettings(readStorage(STORE_SETTINGS_KEY, { brandName: env.storeName }))
+    }
+    window.addEventListener('store-settings-updated', refreshSettings)
+    window.addEventListener('storage', refreshSettings)
+    return () => {
+      window.removeEventListener('store-settings-updated', refreshSettings)
+      window.removeEventListener('storage', refreshSettings)
+    }
+  }, [])
 
   function refreshRole() {
     const nextRole = readStorage(ROLE_STORAGE_KEY, 'customer')
@@ -83,7 +98,7 @@ function AppShell() {
       <header className="sticky top-0 z-40 border-b border-line bg-cream/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div>
-            <p className="text-xs font-semibold text-accent">{env.storeName}</p>
+            <p className="text-xs font-semibold text-accent">{brandName}</p>
             <h1 className="text-lg font-black text-ink">{env.appName}</h1>
           </div>
           <button className="rounded-2xl bg-white p-3 md:hidden" onClick={() => setOpen(!open)} type="button"><Menu size={20} /></button>
