@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Pencil, Plus, Tags, Trash2 } from 'lucide-react'
+import { Pencil, Tags, Trash2, X } from 'lucide-react'
 import ProductEditor from '../components/ProductEditor'
 import { productService } from '../services/productService'
 import { formatPrice } from '../utils/price'
@@ -52,8 +52,7 @@ export default function ProductManagementPage() {
     const savedCategory = product.category || categories[0] || '未分類'
     if (!categories.includes(savedCategory)) persistCategories([...categories, savedCategory])
     await productService.saveProduct({ ...product, category: savedCategory })
-    setEditingProduct(null)
-    setIsCreating(false)
+    closeEditor()
     await loadProducts()
   }
 
@@ -73,11 +72,28 @@ export default function ProductManagementPage() {
     await productService.resetProducts()
     writeStorage(CATEGORY_STORAGE_KEY, FALLBACK_CATEGORIES)
     setActiveCategory('全部')
+    closeEditor()
     await loadProducts()
   }
 
   function createProduct() {
+    setEditingProduct(null)
     setIsCreating(true)
+  }
+
+  function editProduct(product) {
+    setIsCreating(false)
+    setEditingProduct({
+      ...product,
+      optionGroups: (product.optionGroups || []).map((group) => ({
+        ...group,
+        options: (group.options || []).map((option) => ({ ...option }))
+      }))
+    })
+  }
+
+  function closeEditor() {
+    setIsCreating(false)
     setEditingProduct(null)
   }
 
@@ -131,6 +147,8 @@ export default function ProductManagementPage() {
     await loadProducts()
   }
 
+  const editorOpen = isCreating || !!editingProduct
+
   return (
     <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[420px_1fr]">
       <aside className="space-y-4">
@@ -175,10 +193,6 @@ export default function ProductManagementPage() {
             ))}
           </div>
         </section>
-
-        {(isCreating || editingProduct) && (
-          <ProductEditor categories={categories} product={editingProduct} onCancel={() => { setIsCreating(false); setEditingProduct(null) }} onSave={saveProduct} />
-        )}
       </aside>
 
       <main className="space-y-4">
@@ -214,7 +228,7 @@ export default function ProductManagementPage() {
                     <p className="mt-1 text-xs text-muted">{product.optionGroups?.length || 0} 組客製化選項</p>
                   </div>
                   <div className="flex flex-wrap justify-end gap-2">
-                    <button className="btn-secondary py-2" onClick={() => { setEditingProduct(product); setIsCreating(false) }} type="button">編輯</button>
+                    <button className="btn-secondary py-2" onClick={() => editProduct(product)} type="button">編輯</button>
                     <button className="btn-secondary py-2" onClick={() => toggleAvailable(product)} type="button">{product.isAvailable ? '下架' : '上架'}</button>
                     <button className="btn-danger py-2" onClick={() => deleteProduct(product.id)} type="button">刪除</button>
                   </div>
@@ -224,6 +238,17 @@ export default function ProductManagementPage() {
           </section>
         )}
       </main>
+
+      {editorOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-6 backdrop-blur-sm">
+          <div className="mx-auto max-w-3xl">
+            <div className="mb-3 flex justify-end">
+              <button className="rounded-2xl bg-white p-3 text-ink shadow-soft" type="button" onClick={closeEditor} aria-label="關閉編輯視窗"><X size={20} /></button>
+            </div>
+            <ProductEditor categories={categories} product={editingProduct} onCancel={closeEditor} onSave={saveProduct} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
