@@ -16,6 +16,7 @@ const tabs = [
 ]
 
 const diningLabels = { dine_in: '內用', takeaway: '自取', preorder: '預訂單' }
+const sourceLabels = { customer_online: '線上預約', counter: '門店點餐' }
 
 export default function OrderManagementPage({ role: roleProp }) {
   const role = roleProp || readStorage(MOCK_ROLE_KEY, 'customer')
@@ -46,6 +47,12 @@ export default function OrderManagementPage({ role: roleProp }) {
     const sameDate = !date || order.createdAt?.slice(0, 10) === date
     return sameOwner && sameType && sameStatus && sameDate
   }), [orders, tab, status, date, isStore, customerProfile.phone])
+
+  async function acceptOrder(orderId) {
+    if (!isStore) return
+    await orderService.acceptOrder(orderId)
+    await loadOrders()
+  }
 
   async function changeStatus(orderId, nextStatus) {
     if (!isStore) return
@@ -82,8 +89,8 @@ export default function OrderManagementPage({ role: roleProp }) {
           <input className="input" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
           <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="all">全部狀態</option>
-            <option value="pending">待處理</option>
-            <option value="accepted">已接單</option>
+            <option value="pending">待接單</option>
+            <option value="accepted">已接收</option>
             <option value="preparing">製作中</option>
             <option value="completed">已完成</option>
             <option value="cancelled">已取消</option>
@@ -105,12 +112,15 @@ export default function OrderManagementPage({ role: roleProp }) {
           {filtered.map((order) => {
             const itemSummary = (order.items || []).map((item) => `${item.name}×${item.quantity}`).join('、')
             const expanded = expandedOrderId === order.id
+            const isOnlineOrder = order.source === 'customer_online'
+            const needsAccept = isOnlineOrder && order.status === 'pending'
             return (
               <article key={order.id} className="bg-white px-4 py-4">
                 <div className="grid gap-3 lg:grid-cols-[150px_1fr_120px_110px_130px_190px] lg:items-center">
                   <button className="text-left" type="button" onClick={() => setExpandedOrderId(expanded ? null : order.id)}>
                     <p className="font-black text-ink">{order.orderNumber}</p>
                     <p className="mt-1 text-xs text-muted">{new Date(order.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="mt-1 text-xs font-bold text-accent">{sourceLabels[order.source] || order.source}</p>
                   </button>
 
                   <div>
@@ -127,7 +137,7 @@ export default function OrderManagementPage({ role: roleProp }) {
                   <StatusBadge status={order.status} />
 
                   <div className="flex flex-wrap gap-2">
-                    {isStore && order.status === 'pending' && <button className="btn-secondary py-2" type="button" onClick={() => changeStatus(order.id, 'accepted')}>接單</button>}
+                    {isStore && needsAccept && <button className="btn-secondary py-2" type="button" onClick={() => acceptOrder(order.id)}>接單</button>}
                     {isStore && order.status !== 'cancelled' && order.status !== 'completed' && <button className="btn-secondary py-2" type="button" onClick={() => setEditingOrder(order)}><Pencil size={15} className="inline-block" /> 修改</button>}
                     {isStore && order.status !== 'cancelled' && <button className="btn-danger py-2" type="button" onClick={() => cancelOrder(order.id)}><XCircle size={15} className="inline-block" /> 取消</button>}
                     {!isStore && <button className="btn-secondary py-2" type="button" onClick={() => setExpandedOrderId(expanded ? null : order.id)}>{expanded ? '收合' : '明細'}</button>}
@@ -139,6 +149,8 @@ export default function OrderManagementPage({ role: roleProp }) {
                     <div className="grid gap-2 text-sm md:grid-cols-2">
                       <p>手機：{order.customer?.phone || '未填'}</p>
                       <p>門店：{order.store?.name || '未指定'}</p>
+                      <p>來源：{sourceLabels[order.source] || order.source}</p>
+                      {order.acceptedAt && <p>接單時間：{new Date(order.acceptedAt).toLocaleString('zh-TW')}</p>}
                       {order.note && <p className="md:col-span-2">備註：{order.note}</p>}
                       {order.cancelReason && <p className="text-red-700 md:col-span-2">取消原因：{order.cancelReason}</p>}
                     </div>
