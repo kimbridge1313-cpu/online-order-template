@@ -237,7 +237,7 @@ export default function OrderPage() {
   function OrderOptionsPanel() {
     return (
       <div className="space-y-4">
-        <StoreSelector />
+        {!isStore && <StoreSelector />}
         <section className="card p-4">
           <h2 className="font-black">用餐方式</h2>
           <div className="mt-3"><DiningTypeSelector value={diningType} onChange={setDiningType} /></div>
