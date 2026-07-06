@@ -331,14 +331,6 @@ export default function OrderPage() {
   return (
     <div className="mx-auto max-w-7xl px-0 py-0 pb-32 lg:px-4 lg:py-6 lg:pb-6">
       <main className={isStore ? 'space-y-4 px-4 lg:space-y-6 lg:px-0 lg:grid lg:grid-cols-[1fr_360px] lg:gap-6' : 'space-y-0'}>
-        {isStore && (
-          <section className="card hidden p-5 lg:block lg:col-span-2">
-            <p className="text-xs font-semibold text-accent">{env.storeName}</p>
-            <h1 className="mt-1 text-3xl font-black">訂餐頁</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-muted"><span>門店櫃檯模式｜一段式快速點餐</span><span>·</span><button className="underline" type="button" onClick={() => updateRole('customer')}>模板測試：切換為顧客帳號</button>{role !== 'owner' && <><span>·</span><button className="underline" type="button" onClick={() => updateRole('owner')}>切換為老闆帳號</button></>}</div>
-          </section>
-        )}
-
         {!isStore && (
           <section className="grid h-[calc(100vh-73px)] grid-cols-[116px_1fr] overflow-hidden bg-white lg:h-[calc(100vh-81px)] lg:rounded-3xl lg:border lg:border-line">
             <aside className="overflow-y-auto border-r border-line bg-white pb-28">
