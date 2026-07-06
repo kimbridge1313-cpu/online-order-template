@@ -1,8 +1,9 @@
 import { Component, useMemo, useState } from 'react'
-import { ClipboardList, Menu, Package, ShoppingBag } from 'lucide-react'
+import { ClipboardList, Menu, Package, Settings, ShoppingBag } from 'lucide-react'
 import OrderPage from './pages/OrderPage'
 import OrderManagementPage from './pages/OrderManagementPage'
 import ProductManagementPage from './pages/ProductManagementPage'
+import StoreSettingsPage from './pages/StoreSettingsPage'
 import { env } from './config/env'
 import { readStorage } from './utils/storage'
 
@@ -51,7 +52,7 @@ function AppShell() {
   function refreshRole() {
     const nextRole = readStorage(ROLE_STORAGE_KEY, 'customer')
     setRole(nextRole)
-    if (nextRole !== 'store' && page === 'products') setPage('order')
+    if (nextRole !== 'store' && (page === 'products' || page === 'settings')) setPage('order')
   }
 
   const navItems = useMemo(() => {
@@ -59,7 +60,8 @@ function AppShell() {
       return [
         { value: 'order', label: '訂餐頁', icon: ShoppingBag },
         { value: 'orders', label: '訂單管理', icon: ClipboardList },
-        { value: 'products', label: '商品管理', icon: Package }
+        { value: 'products', label: '商品管理', icon: Package },
+        { value: 'settings', label: '設定', icon: Settings }
       ]
     }
     return [
@@ -68,7 +70,13 @@ function AppShell() {
     ]
   }, [isStore])
 
-  const CurrentPage = page === 'orders' ? OrderManagementPage : page === 'products' && isStore ? ProductManagementPage : OrderPage
+  const CurrentPage = page === 'orders'
+    ? OrderManagementPage
+    : page === 'products' && isStore
+      ? ProductManagementPage
+      : page === 'settings' && isStore
+        ? StoreSettingsPage
+        : OrderPage
 
   return (
     <div className="min-h-screen">
