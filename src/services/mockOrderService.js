@@ -1,5 +1,6 @@
 import { readStorage, writeStorage } from '../utils/storage'
 import { createOrderNumber } from '../utils/orderNumber'
+import { lineNotificationService } from './lineNotificationService'
 
 const STORAGE_KEY = 'online-order-template-orders'
 
@@ -27,6 +28,7 @@ export const mockOrderService = {
     }
     const next = [order, ...list()]
     saveAll(next)
+    await lineNotificationService.notifyNewOrder(order)
     return order
   },
   async updateOrder(orderId, patch) {
@@ -37,10 +39,12 @@ export const mockOrderService = {
     return next.find((order) => order.id === orderId)
   },
   async cancelOrder(orderId, cancelReason = '') {
-    return this.updateOrder(orderId, {
+    const order = await this.updateOrder(orderId, {
       status: 'cancelled',
       cancelReason,
       cancelledAt: new Date().toISOString()
     })
+    if (order) await lineNotificationService.notifyCancelledOrder(order)
+    return order
   }
 }
