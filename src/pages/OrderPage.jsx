@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, MessageCircle, ShoppingBag, UserRound } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronUp, MessageCircle, Minus, Plus, ShoppingBag, Trash2, UserRound } from 'lucide-react'
 import ProductCard from '../components/ProductCard'
 import ProductOptionModal from '../components/ProductOptionModal'
 import CartPanel from '../components/CartPanel'
@@ -27,6 +27,7 @@ export default function OrderPage() {
   const [category, setCategory] = useState('全部')
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [cartItems, setCartItems] = useState([])
+  const [mobileCartOpen, setMobileCartOpen] = useState(false)
   const [checkoutStep, setCheckoutStep] = useState('ordering')
   const [diningType, setDiningType] = useState('dine_in')
   const [bagging, setBagging] = useState(false)
@@ -40,6 +41,7 @@ export default function OrderPage() {
   const isStore = role === 'store'
   const hasProfile = isStore || Boolean(profile?.name && profile?.phone)
   const source = isStore ? 'counter' : 'customer_online'
+  const cartTotal = calculateCartTotal(cartItems)
 
   async function loadProducts() {
     const data = await productService.listProducts()
@@ -82,9 +84,22 @@ export default function OrderPage() {
     setCartItems(cartItems.filter((_, itemIndex) => itemIndex !== index))
   }
 
+  function updateCartQuantity(index, nextQuantity) {
+    const quantity = Math.max(1, Number(nextQuantity || 1))
+    setCartItems(cartItems.map((item, itemIndex) => {
+      if (itemIndex !== index) return item
+      return {
+        ...item,
+        quantity,
+        subtotal: Number(item.unitPrice || 0) * quantity
+      }
+    }))
+  }
+
   function goCheckout() {
     setMessage('')
     if (cartItems.length === 0) return setMessage('請先加入商品。')
+    setMobileCartOpen(false)
     setCheckoutStep('checkout')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -252,9 +267,9 @@ export default function OrderPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 pb-28 lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:pb-6">
-      <main className="space-y-6">
-        <section className="card p-5">
+    <div className="mx-auto max-w-7xl px-4 py-4 pb-32 lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:py-6 lg:pb-6">
+      <main className="space-y-4 lg:space-y-6">
+        <section className="card hidden p-5 lg:block">
           <p className="text-xs font-semibold text-accent">{env.storeName}</p>
           <h1 className="mt-1 text-3xl font-black">訂餐頁</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-muted">
@@ -281,14 +296,52 @@ export default function OrderPage() {
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 p-3 shadow-soft backdrop-blur lg:hidden">
-        <div className="mx-auto flex max-w-2xl items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-muted">購物車 {cartItems.length} 項</p>
-            <p className="text-xl font-black text-brand">{formatPrice(calculateCartTotal(cartItems))}</p>
+        <div className="mx-auto max-w-2xl">
+          {mobileCartOpen && (
+            <div className="mb-3 max-h-[44vh] space-y-2 overflow-auto rounded-3xl border border-line bg-cream p-3">
+              {cartItems.length === 0 && <p className="rounded-2xl bg-white p-4 text-sm text-muted">尚未加入商品。</p>}
+              {cartItems.map((item, index) => (
+                <div key={`${item.productId}-${index}`} className="rounded-2xl border border-line bg-white p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-ink">{item.name}</p>
+                      {item.selectedOptions?.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-xs text-muted">
+                          {item.selectedOptions.map((option) => (
+                            <li key={`${option.groupId}-${option.optionId}`}>{option.groupName}：{option.optionName}{option.priceDelta > 0 ? ` +${formatPrice(option.priceDelta)}` : ''}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {item.note && <p className="mt-1 text-xs text-muted">備註：{item.note}</p>}
+                    </div>
+                    <button className="rounded-xl p-2 text-red-600 hover:bg-red-50" type="button" onClick={() => removeFromCart(index)} aria-label="刪除商品"><Trash2 size={18} /></button>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="font-black text-brand">{formatPrice(item.subtotal)}</p>
+                    <div className="flex items-center gap-2">
+                      <button className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-white" type="button" onClick={() => updateCartQuantity(index, item.quantity - 1)} aria-label="減少數量"><Minus size={16} /></button>
+                      <span className="w-7 text-center font-bold">{item.quantity}</span>
+                      <button className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-white" type="button" onClick={() => updateCartQuantity(index, item.quantity + 1)} aria-label="增加數量"><Plus size={16} /></button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button className="flex min-w-0 flex-1 items-center justify-between rounded-2xl bg-cream px-4 py-3 text-left" type="button" onClick={() => setMobileCartOpen(!mobileCartOpen)}>
+              <span>
+                <span className="block text-xs font-semibold text-muted">購物車 {cartItems.length} 項</span>
+                <span className="block text-xl font-black text-brand">{formatPrice(cartTotal)}</span>
+              </span>
+              {mobileCartOpen ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+            </button>
+            <button className="btn-primary shrink-0" type="button" disabled={cartItems.length === 0} onClick={goCheckout}>
+              <ShoppingBag size={18} className="inline-block" /> 點餐完畢
+            </button>
           </div>
-          <button className="btn-primary shrink-0" type="button" disabled={cartItems.length === 0} onClick={goCheckout}>
-            <ShoppingBag size={18} className="inline-block" /> 點餐完畢
-          </button>
         </div>
       </div>
 
