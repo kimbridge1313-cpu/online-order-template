@@ -5,17 +5,9 @@ import { readStorage, writeStorage } from '../utils/storage'
 const STORE_SETTINGS_KEY = 'online-order-template-store-settings'
 const STORE_LIST_KEY = 'online-order-template-store-list'
 const ROLE_STORAGE_KEY = 'online-order-template-role'
-const defaultSettings = { tableNumberEnabled: false, tableNumbers: [] }
+const defaultSettings = { brandName: '示範店家', tableNumberEnabled: false, tableNumbers: [] }
 const defaultStores = [
-  {
-    id: 'demo-store',
-    name: '示範門店',
-    accountName: 'demo-store-account',
-    latitude: 23.6978,
-    longitude: 120.9605,
-    address: '示範地址',
-    isActive: true
-  }
+  { id: 'demo-store', name: '示範門店', accountName: 'demo-store-account', latitude: 23.6978, longitude: 120.9605, address: '示範地址', isActive: true }
 ]
 
 export default function StoreSettingsPage({ role: roleProp }) {
@@ -32,6 +24,7 @@ export default function StoreSettingsPage({ role: roleProp }) {
   function updateSettings(nextSettings) {
     setSettings(nextSettings)
     writeStorage(STORE_SETTINGS_KEY, nextSettings)
+    window.dispatchEvent(new Event('store-settings-updated'))
   }
 
   function persistStores(nextStores) {
@@ -42,16 +35,14 @@ export default function StoreSettingsPage({ role: roleProp }) {
   function addTable() {
     const name = tableDraft.trim()
     if (!name) return
-    const nextTables = [...(settings.tableNumbers || []), { id: `table-${Date.now()}`, name }]
-    updateSettings({ ...settings, tableNumbers: nextTables })
+    updateSettings({ ...settings, tableNumbers: [...(settings.tableNumbers || []), { id: `table-${Date.now()}`, name }] })
     setTableDraft('')
   }
 
   function renameTable(tableId) {
     const name = editingTableName.trim()
     if (!name) return
-    const nextTables = (settings.tableNumbers || []).map((table) => table.id === tableId ? { ...table, name } : table)
-    updateSettings({ ...settings, tableNumbers: nextTables })
+    updateSettings({ ...settings, tableNumbers: (settings.tableNumbers || []).map((table) => table.id === tableId ? { ...table, name } : table) })
     setEditingTableId(null)
     setEditingTableName('')
   }
@@ -78,22 +69,13 @@ export default function StoreSettingsPage({ role: roleProp }) {
       address: storeDraft.address,
       isActive: true
     }
-    const nextStores = editingStoreId
-      ? stores.map((store) => store.id === editingStoreId ? payload : store)
-      : [...stores, payload]
-    persistStores(nextStores)
+    persistStores(editingStoreId ? stores.map((store) => store.id === editingStoreId ? payload : store) : [...stores, payload])
     resetStoreDraft()
   }
 
   function editStore(store) {
     setEditingStoreId(store.id)
-    setStoreDraft({
-      name: store.name || '',
-      accountName: store.accountName || '',
-      latitude: String(store.latitude || ''),
-      longitude: String(store.longitude || ''),
-      address: store.address || ''
-    })
+    setStoreDraft({ name: store.name || '', accountName: store.accountName || '', latitude: String(store.latitude || ''), longitude: String(store.longitude || ''), address: store.address || '' })
   }
 
   function deleteStore(storeId) {
@@ -108,13 +90,7 @@ export default function StoreSettingsPage({ role: roleProp }) {
   function useCurrentLocationForStore() {
     if (!navigator.geolocation) return window.alert('此瀏覽器不支援定位。')
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setStoreDraft({
-          ...storeDraft,
-          latitude: String(position.coords.latitude),
-          longitude: String(position.coords.longitude)
-        })
-      },
+      (position) => setStoreDraft({ ...storeDraft, latitude: String(position.coords.latitude), longitude: String(position.coords.longitude) }),
       () => window.alert('無法取得目前定位，請手動輸入座標。')
     )
   }
@@ -123,31 +99,29 @@ export default function StoreSettingsPage({ role: roleProp }) {
     <div className="mx-auto max-w-5xl px-4 py-6">
       <section className="card p-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cream text-brand">
-            <Settings size={22} />
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-accent">Store Settings</p>
-            <h1 className="text-3xl font-black">門店設定</h1>
-          </div>
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cream text-brand"><Settings size={22} /></div>
+          <div><p className="text-xs font-semibold text-accent">Store Settings</p><h1 className="text-3xl font-black">門店設定</h1></div>
         </div>
         <p className="mt-4 text-sm leading-6 text-muted">這裡放門店營運設定。模板版先使用 localStorage，正式版可接到 Firebase 店家設定。</p>
       </section>
+
+      {isOwner && (
+        <section className="card mt-5 p-5">
+          <h2 className="text-xl font-black">品牌設定</h2>
+          <p className="mt-2 text-sm text-muted">老闆可以設定品牌名稱，會同步顯示在頁首 Header。</p>
+          <label className="mt-4 block space-y-1">
+            <span className="label">品牌名稱</span>
+            <input className="input" value={settings.brandName || ''} onChange={(event) => updateSettings({ ...settings, brandName: event.target.value })} placeholder="例如：先生手作千層" />
+          </label>
+        </section>
+      )}
 
       <section className="card mt-5 p-5">
         <h2 className="text-xl font-black">桌號設定</h2>
         <p className="mt-2 text-sm text-muted">開啟後，門店訂餐頁會顯示桌號欄位；關閉後不會出現桌號。</p>
         <label className="mt-5 flex items-center justify-between gap-4 rounded-3xl border border-line bg-white p-4">
-          <span>
-            <span className="block font-bold text-ink">啟用桌號</span>
-            <span className="mt-1 block text-xs text-muted">適合內用桌邊點餐、平板櫃檯點餐。</span>
-          </span>
-          <input
-            className="h-5 w-5"
-            type="checkbox"
-            checked={!!settings.tableNumberEnabled}
-            onChange={(event) => updateSettings({ ...settings, tableNumberEnabled: event.target.checked })}
-          />
+          <span><span className="block font-bold text-ink">啟用桌號</span><span className="mt-1 block text-xs text-muted">適合內用桌邊點餐、平板櫃檯點餐。</span></span>
+          <input className="h-5 w-5" type="checkbox" checked={!!settings.tableNumberEnabled} onChange={(event) => updateSettings({ ...settings, tableNumberEnabled: event.target.checked })} />
         </label>
 
         {settings.tableNumberEnabled && (
@@ -160,18 +134,9 @@ export default function StoreSettingsPage({ role: roleProp }) {
               {(settings.tableNumbers || []).map((table) => (
                 <div key={table.id} className="rounded-2xl border border-line bg-white p-3">
                   {editingTableId === table.id ? (
-                    <div className="flex gap-2">
-                      <input className="input" value={editingTableName} onChange={(event) => setEditingTableName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') renameTable(table.id) }} />
-                      <button className="btn-primary shrink-0 py-2" type="button" onClick={() => renameTable(table.id)}>儲存</button>
-                    </div>
+                    <div className="flex gap-2"><input className="input" value={editingTableName} onChange={(event) => setEditingTableName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') renameTable(table.id) }} /><button className="btn-primary shrink-0 py-2" type="button" onClick={() => renameTable(table.id)}>儲存</button></div>
                   ) : (
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-bold">{table.name}</span>
-                      <div className="flex gap-1">
-                        <button className="rounded-xl border border-line p-2 text-muted hover:text-brand" type="button" onClick={() => { setEditingTableId(table.id); setEditingTableName(table.name) }}><Pencil size={16} /></button>
-                        <button className="rounded-xl border border-line p-2 text-red-600 hover:bg-red-50" type="button" onClick={() => deleteTable(table.id)}><Trash2 size={16} /></button>
-                      </div>
-                    </div>
+                    <div className="flex items-center justify-between gap-3"><span className="font-bold">{table.name}</span><div className="flex gap-1"><button className="rounded-xl border border-line p-2 text-muted hover:text-brand" type="button" onClick={() => { setEditingTableId(table.id); setEditingTableName(table.name) }}><Pencil size={16} /></button><button className="rounded-xl border border-line p-2 text-red-600 hover:bg-red-50" type="button" onClick={() => deleteTable(table.id)}><Trash2 size={16} /></button></div></div>
                   )}
                 </div>
               ))}
@@ -183,57 +148,21 @@ export default function StoreSettingsPage({ role: roleProp }) {
 
       {isOwner && (
         <section className="card mt-5 p-5">
-          <div className="flex items-center gap-2">
-            <Store className="text-accent" size={20} />
-            <h2 className="text-xl font-black">門店管理</h2>
-          </div>
+          <div className="flex items-center gap-2"><Store className="text-accent" size={20} /><h2 className="text-xl font-black">門店管理</h2></div>
           <p className="mt-2 text-sm text-muted">老闆權限可新增門店帳號與定位。顧客點餐時會依 GPS 預設選擇最近門店。</p>
-
           <form className="mt-5 grid gap-3 md:grid-cols-2" onSubmit={saveStore}>
-            <label className="space-y-1">
-              <span className="label">門店名稱 *</span>
-              <input className="input" value={storeDraft.name} onChange={(event) => setStoreDraft({ ...storeDraft, name: event.target.value })} required />
-            </label>
-            <label className="space-y-1">
-              <span className="label">門店帳號 *</span>
-              <input className="input" value={storeDraft.accountName} onChange={(event) => setStoreDraft({ ...storeDraft, accountName: event.target.value })} required />
-            </label>
-            <label className="space-y-1">
-              <span className="label">緯度</span>
-              <input className="input" type="number" step="any" value={storeDraft.latitude} onChange={(event) => setStoreDraft({ ...storeDraft, latitude: event.target.value })} />
-            </label>
-            <label className="space-y-1">
-              <span className="label">經度</span>
-              <input className="input" type="number" step="any" value={storeDraft.longitude} onChange={(event) => setStoreDraft({ ...storeDraft, longitude: event.target.value })} />
-            </label>
-            <label className="space-y-1 md:col-span-2">
-              <span className="label">地址</span>
-              <input className="input" value={storeDraft.address} onChange={(event) => setStoreDraft({ ...storeDraft, address: event.target.value })} />
-            </label>
-            <div className="flex flex-wrap gap-2 md:col-span-2">
-              <button className="btn-primary" type="submit">{editingStoreId ? '儲存門店' : '新增門店'}</button>
-              <button className="btn-secondary" type="button" onClick={useCurrentLocationForStore}><MapPin size={16} className="inline-block" /> 使用目前定位</button>
-              {editingStoreId && <button className="btn-secondary" type="button" onClick={resetStoreDraft}>取消編輯</button>}
-            </div>
+            <label className="space-y-1"><span className="label">門店名稱 *</span><input className="input" value={storeDraft.name} onChange={(event) => setStoreDraft({ ...storeDraft, name: event.target.value })} required /></label>
+            <label className="space-y-1"><span className="label">門店帳號 *</span><input className="input" value={storeDraft.accountName} onChange={(event) => setStoreDraft({ ...storeDraft, accountName: event.target.value })} required /></label>
+            <label className="space-y-1"><span className="label">緯度</span><input className="input" type="number" step="any" value={storeDraft.latitude} onChange={(event) => setStoreDraft({ ...storeDraft, latitude: event.target.value })} /></label>
+            <label className="space-y-1"><span className="label">經度</span><input className="input" type="number" step="any" value={storeDraft.longitude} onChange={(event) => setStoreDraft({ ...storeDraft, longitude: event.target.value })} /></label>
+            <label className="space-y-1 md:col-span-2"><span className="label">地址</span><input className="input" value={storeDraft.address} onChange={(event) => setStoreDraft({ ...storeDraft, address: event.target.value })} /></label>
+            <div className="flex flex-wrap gap-2 md:col-span-2"><button className="btn-primary" type="submit">{editingStoreId ? '儲存門店' : '新增門店'}</button><button className="btn-secondary" type="button" onClick={useCurrentLocationForStore}><MapPin size={16} className="inline-block" /> 使用目前定位</button>{editingStoreId && <button className="btn-secondary" type="button" onClick={resetStoreDraft}>取消編輯</button>}</div>
           </form>
-
           <div className="mt-6 grid gap-3 md:grid-cols-2">
             {stores.map((store) => (
               <article key={store.id} className={`rounded-3xl border border-line bg-white p-4 ${!store.isActive ? 'opacity-60' : ''}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-black">{store.name}</p>
-                    <p className="mt-1 text-xs text-muted">帳號：{store.accountName}</p>
-                    <p className="mt-1 text-xs text-muted">{store.address || '未填地址'}</p>
-                    <p className="mt-1 text-xs text-muted">{store.latitude}, {store.longitude}</p>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${store.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{store.isActive ? '啟用' : '停用'}</span>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button className="btn-secondary py-2" type="button" onClick={() => editStore(store)}>修改</button>
-                  <button className="btn-secondary py-2" type="button" onClick={() => toggleStoreActive(store)}>{store.isActive ? '停用' : '啟用'}</button>
-                  <button className="btn-danger py-2" type="button" onClick={() => deleteStore(store.id)}>刪除</button>
-                </div>
+                <div className="flex items-start justify-between gap-3"><div><p className="font-black">{store.name}</p><p className="mt-1 text-xs text-muted">帳號：{store.accountName}</p><p className="mt-1 text-xs text-muted">{store.address || '未填地址'}</p><p className="mt-1 text-xs text-muted">{store.latitude}, {store.longitude}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${store.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{store.isActive ? '啟用' : '停用'}</span></div>
+                <div className="mt-4 flex flex-wrap gap-2"><button className="btn-secondary py-2" type="button" onClick={() => editStore(store)}>修改</button><button className="btn-secondary py-2" type="button" onClick={() => toggleStoreActive(store)}>{store.isActive ? '停用' : '啟用'}</button><button className="btn-danger py-2" type="button" onClick={() => deleteStore(store.id)}>刪除</button></div>
               </article>
             ))}
           </div>
