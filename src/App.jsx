@@ -6,10 +6,10 @@ import ProductManagementPage from './pages/ProductManagementPage'
 import StoreSettingsPage from './pages/StoreSettingsPage'
 import DailyClosingPage from './pages/DailyClosingPage'
 import { env } from './config/env'
+import { storeConfigService } from './services/storeConfigService'
 import { readStorage, writeStorage } from './utils/storage'
 
 const ROLE_STORAGE_KEY = 'online-order-template-role'
-const STORE_SETTINGS_KEY = 'online-order-template-store-settings'
 
 class AppErrorBoundary extends Component {
   constructor(props) {
@@ -49,17 +49,21 @@ function AppShell() {
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
   const [role, setRole] = useState(() => readStorage(ROLE_STORAGE_KEY, 'customer'))
-  const [storeSettings, setStoreSettings] = useState(() => readStorage(STORE_SETTINGS_KEY, { brandName: env.storeName }))
+  const [storeSettings, setStoreSettings] = useState({ brandName: env.storeName })
   const isAdmin = role === 'store' || role === 'owner'
   const brandName = storeSettings?.brandName || env.storeName
 
   useEffect(() => {
-    function refreshSettings() {
-      setStoreSettings(readStorage(STORE_SETTINGS_KEY, { brandName: env.storeName }))
+    let mounted = true
+    async function refreshSettings() {
+      const nextSettings = await storeConfigService.getSettings()
+      if (mounted) setStoreSettings(nextSettings)
     }
+    refreshSettings()
     window.addEventListener('store-settings-updated', refreshSettings)
     window.addEventListener('storage', refreshSettings)
     return () => {
+      mounted = false
       window.removeEventListener('store-settings-updated', refreshSettings)
       window.removeEventListener('storage', refreshSettings)
     }
