@@ -78,6 +78,31 @@ export default function DailyClosingPage({ role: roleProp }) {
     await loadData()
   }
 
+  async function undoPaid(order) {
+    setMessage('')
+    if (!window.confirm(`確定要取消 ${order.orderNumber} 的收款紀錄嗎？取消後會回到線上待收款。`)) return
+    await orderService.markOrderUnpaid(order.id)
+    setMessage(`${order.orderNumber} 已取消收款，已回到線上待收款。`)
+    await loadData()
+  }
+
+  function editClosing(record) {
+    setBusinessDate(record.businessDate)
+    setStoreId(record.storeId)
+    setCashActual(String(record.cashActual || 0))
+    setNote(record.note || '')
+    setMessage(`已載入 ${record.businessDate} ${record.storeName}，修正後按「確認結帳」即可覆蓋。`)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function deleteClosing(record) {
+    setMessage('')
+    if (!window.confirm(`確定要刪除 ${record.businessDate} ${record.storeName} 的日結紀錄嗎？`)) return
+    await dailyClosingService.deleteClosing(record.id)
+    setMessage(`已刪除 ${record.businessDate} ${record.storeName} 日結紀錄。`)
+    await loadData()
+  }
+
   async function closeDay() {
     setMessage('')
     if (!summary) return
@@ -127,7 +152,7 @@ export default function DailyClosingPage({ role: roleProp }) {
         <>
           {summary.existingClosing && (
             <section className="mt-5 rounded-3xl border border-green-200 bg-green-50 p-4 text-green-800">
-              <div className="flex items-center gap-2 font-bold"><CheckCircle2 size={18} /> 此日期已結帳</div>
+              <div className="flex items-center gap-2 font-bold"><CheckCircle2 size={18} /> 此日期已有日結紀錄，可直接修正後重新確認結帳覆蓋。</div>
               <p className="mt-1 text-sm">結帳時間：{new Date(summary.existingClosing.closedAt).toLocaleString('zh-TW')}｜差額：{formatPrice(summary.existingClosing.cashDifference)}</p>
             </section>
           )}
@@ -162,16 +187,19 @@ export default function DailyClosingPage({ role: roleProp }) {
 
             <div className="card p-5">
               <h2 className="text-xl font-black">今日訂單明細</h2>
-              <p className="mt-1 text-sm text-muted">只顯示今日已收款訂單。門店櫃檯訂單建立後預設已收款；線上訂單收款後才會進來。</p>
+              <p className="mt-1 text-sm text-muted">只顯示今日已收款訂單。線上訂單誤按已收款時，可以在這裡取消收款。</p>
               <div className="mt-3 divide-y divide-line rounded-3xl border border-line bg-white">
                 {summary.orders.map((order) => (
-                  <div key={order.id} className="grid gap-2 p-3 text-sm md:grid-cols-[140px_1fr_120px] md:items-center">
+                  <div key={order.id} className="grid gap-2 p-3 text-sm md:grid-cols-[140px_1fr_120px_104px] md:items-center">
                     <div>
                       <p className="font-black">{order.orderNumber}</p>
                       <p className="text-xs text-muted">{order.paidAt ? new Date(order.paidAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
                     </div>
                     <p className="text-muted">{order.customer?.name || '門店櫃檯'}｜{order.source === 'customer_online' ? '線上' : '門店'}｜{paymentMethodLabels[order.paymentMethod] || '現金'}</p>
                     <p className="font-black text-brand">{formatPrice(order.totalAmount)}</p>
+                    {order.source === 'customer_online' ? (
+                      <button className="btn-secondary py-2 text-xs" type="button" onClick={() => undoPaid(order)}>取消收款</button>
+                    ) : <span className="text-xs text-muted">櫃檯單</span>}
                   </div>
                 ))}
                 {summary.orders.length === 0 && <p className="p-6 text-center text-sm text-muted">此日期目前沒有已收款訂單。</p>}
@@ -200,8 +228,8 @@ export default function DailyClosingPage({ role: roleProp }) {
                 <textarea className="input min-h-24" value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：現金短少、補登說明" />
               </label>
               {message && <p className="mt-4 rounded-2xl bg-green-50 p-3 text-sm font-semibold text-green-700">{message}</p>}
-              <button className="btn-primary mt-4 w-full" type="button" onClick={closeDay}>確認結帳</button>
-              <p className="mt-3 text-xs leading-5 text-muted">第一版允許同日重新結帳，系統會覆蓋同日期、同門店的日結紀錄。</p>
+              <button className="btn-primary mt-4 w-full" type="button" onClick={closeDay}>{summary.existingClosing ? '儲存修改' : '確認結帳'}</button>
+              <p className="mt-3 text-xs leading-5 text-muted">同日重新結帳會覆蓋同日期、同門店的日結紀錄；歷史日結也可以載入修改或刪除。</p>
             </aside>
           </section>
         </>
@@ -211,12 +239,16 @@ export default function DailyClosingPage({ role: roleProp }) {
         <h2 className="text-xl font-black">歷史日結</h2>
         <div className="mt-4 divide-y divide-line rounded-3xl border border-line bg-white">
           {closings.filter((record) => isOwner || record.storeId === storeId).slice(0, 12).map((record) => (
-            <div key={record.id} className="grid gap-2 p-3 text-sm md:grid-cols-[130px_1fr_120px_120px_160px] md:items-center">
+            <div key={record.id} className="grid gap-2 p-3 text-sm md:grid-cols-[130px_1fr_120px_120px_160px_150px] md:items-center">
               <p className="font-black">{record.businessDate}</p>
               <p className="text-muted">{record.storeName}</p>
               <p>實收：<strong>{formatPrice(record.netSales)}</strong></p>
               <p>差額：<strong className={record.cashDifference < 0 ? 'text-red-600' : 'text-brand'}>{formatPrice(record.cashDifference)}</strong></p>
               <p className="text-xs text-muted">{new Date(record.closedAt).toLocaleString('zh-TW')}</p>
+              <div className="flex gap-2">
+                <button className="btn-secondary py-2 text-xs" type="button" onClick={() => editClosing(record)}>修改</button>
+                <button className="rounded-2xl p-2 text-red-600 hover:bg-red-50" type="button" onClick={() => deleteClosing(record)} aria-label="刪除日結"><Trash2 size={16} /></button>
+              </div>
             </div>
           ))}
           {closings.length === 0 && <p className="p-6 text-center text-sm text-muted">尚未產生日結紀錄。</p>}
