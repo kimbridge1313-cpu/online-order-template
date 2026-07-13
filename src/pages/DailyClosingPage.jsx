@@ -11,6 +11,15 @@ const defaultStores = [
   { id: 'demo-store', name: '示範門店', accountName: 'demo-store-account', isActive: true }
 ]
 
+const paymentMethodOptions = [
+  { value: 'cash', label: '現金' },
+  { value: 'linepay', label: 'LINE Pay' },
+  { value: 'transfer', label: '轉帳' },
+  { value: 'other', label: '其他' }
+]
+
+const paymentMethodLabels = paymentMethodOptions.reduce((acc, item) => ({ ...acc, [item.value]: item.label }), {})
+
 function getTodayDate() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -37,6 +46,7 @@ export default function DailyClosingPage({ role: roleProp }) {
   const [cashActual, setCashActual] = useState('')
   const [note, setNote] = useState('')
   const [message, setMessage] = useState('')
+  const [collectingOrder, setCollectingOrder] = useState(null)
 
   const selectedStore = useMemo(() => {
     if (storeId === 'all') return { id: 'all', name: '全部門店' }
@@ -57,14 +67,14 @@ export default function DailyClosingPage({ role: roleProp }) {
 
   useEffect(() => { loadData() }, [businessDate, storeId])
 
-  async function markPaid(order) {
+  async function markPaid(order, paymentMethod) {
     setMessage('')
-    const method = window.prompt('收款方式：cash / linepay / transfer / other', 'cash') || 'cash'
     await orderService.markOrderPaid(order.id, {
-      paymentMethod: method,
+      paymentMethod,
       paidBy: isOwner ? '老闆帳號' : '門店帳號'
     })
-    setMessage(`${order.orderNumber} 已收款，已加入今日訂單明細。`)
+    setCollectingOrder(null)
+    setMessage(`${order.orderNumber} 已以${paymentMethodLabels[paymentMethod]}收款，已加入今日訂單明細。`)
     await loadData()
   }
 
@@ -143,7 +153,7 @@ export default function DailyClosingPage({ role: roleProp }) {
                       </div>
                       <p className="font-black text-brand">{formatPrice(order.totalAmount)}</p>
                     </div>
-                    <button className="btn-primary mt-3 w-full py-2" type="button" onClick={() => markPaid(order)}>✓ 收款</button>
+                    <button className="btn-primary mt-3 w-full py-2" type="button" onClick={() => setCollectingOrder(order)}>✓ 收款</button>
                   </div>
                 ))}
                 {(summary.unpaidOnlineOrders || []).length === 0 && <p className="rounded-2xl bg-white p-4 text-sm text-muted">目前沒有線上待收款訂單。</p>}
@@ -160,7 +170,7 @@ export default function DailyClosingPage({ role: roleProp }) {
                       <p className="font-black">{order.orderNumber}</p>
                       <p className="text-xs text-muted">{order.paidAt ? new Date(order.paidAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
                     </div>
-                    <p className="text-muted">{order.customer?.name || '門店櫃檯'}｜{order.source === 'customer_online' ? '線上' : '門店'}｜{order.paymentMethod || 'cash'}</p>
+                    <p className="text-muted">{order.customer?.name || '門店櫃檯'}｜{order.source === 'customer_online' ? '線上' : '門店'}｜{paymentMethodLabels[order.paymentMethod] || '現金'}</p>
                     <p className="font-black text-brand">{formatPrice(order.totalAmount)}</p>
                   </div>
                 ))}
@@ -212,6 +222,24 @@ export default function DailyClosingPage({ role: roleProp }) {
           {closings.length === 0 && <p className="p-6 text-center text-sm text-muted">尚未產生日結紀錄。</p>}
         </div>
       </section>
+
+      {collectingOrder && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 md:items-center md:p-6">
+          <div className="w-full max-w-md rounded-t-3xl bg-cream p-5 shadow-soft md:rounded-3xl">
+            <p className="text-xs font-semibold text-accent">選擇收款方式</p>
+            <h2 className="mt-1 text-2xl font-black">{collectingOrder.orderNumber}</h2>
+            <p className="mt-2 text-sm text-muted">{collectingOrder.customer?.name || '未填姓名'}｜{formatPrice(collectingOrder.totalAmount)}</p>
+            <div className="mt-5 grid gap-2">
+              {paymentMethodOptions.map((option) => (
+                <button key={option.value} className="btn-secondary w-full justify-center" type="button" onClick={() => markPaid(collectingOrder, option.value)}>
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <button className="mt-4 w-full text-sm font-bold text-muted underline" type="button" onClick={() => setCollectingOrder(null)}>取消</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
