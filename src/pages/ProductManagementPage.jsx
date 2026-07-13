@@ -155,7 +155,7 @@ export default function ProductManagementPage() {
         <section className="card p-5">
           <p className="text-xs font-semibold text-accent">Product Management</p>
           <h1 className="mt-1 text-3xl font-black">商品管理頁</h1>
-          <p className="mt-3 text-sm text-muted">商品、分類與客製化選項都先儲存在 localStorage。正式客戶版再接 Firebase。</p>
+          <p className="mt-3 text-sm text-muted">商品資料儲存在系統資料庫；商品圖片會上傳到 Cloudinary，資料庫只保存圖片網址。</p>
           <div className="mt-5 flex flex-wrap gap-2">
             <button className="btn-primary" onClick={createProduct} type="button">新增商品</button>
             <button className="btn-secondary" onClick={resetProducts} type="button">重置示範資料</button>
@@ -212,25 +212,34 @@ export default function ProductManagementPage() {
         ) : (
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {visibleProducts.map((product) => (
-              <article key={product.id} className={`card flex flex-col p-5 ${!product.isAvailable ? 'opacity-60' : ''}`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold text-accent">{product.category}</p>
-                    <h3 className="mt-1 text-xl font-black text-ink">{product.name}</h3>
-                    <p className="mt-2 line-clamp-2 text-sm text-muted">{product.description || '未填寫商品描述'}</p>
-                  </div>
-                  <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${product.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{product.isAvailable ? '上架中' : '已下架'}</span>
+              <article key={product.id} className={`card flex flex-col overflow-hidden ${!product.isAvailable ? 'opacity-60' : ''}`}>
+                <div className="h-40 bg-cream">
+                  {product.imageUrl ? (
+                    <img className="h-full w-full object-cover" src={product.imageUrl} alt={product.name} loading="lazy" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm font-bold text-muted">尚未上傳圖片</div>
+                  )}
                 </div>
-
-                <div className="mt-5 flex items-end justify-between gap-3">
-                  <div>
-                    <p className="text-2xl font-black text-brand">{formatPrice(product.price)}</p>
-                    <p className="mt-1 text-xs text-muted">{product.optionGroups?.length || 0} 組客製化選項</p>
+                <div className="flex flex-1 flex-col p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold text-accent">{product.category}</p>
+                      <h3 className="mt-1 text-xl font-black text-ink">{product.name}</h3>
+                      <p className="mt-2 line-clamp-2 text-sm text-muted">{product.description || '未填寫商品描述'}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${product.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{product.isAvailable ? '上架中' : '已下架'}</span>
                   </div>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <button className="btn-secondary py-2" onClick={() => editProduct(product)} type="button">編輯</button>
-                    <button className="btn-secondary py-2" onClick={() => toggleAvailable(product)} type="button">{product.isAvailable ? '下架' : '上架'}</button>
-                    <button className="btn-danger py-2" onClick={() => deleteProduct(product.id)} type="button">刪除</button>
+
+                  <div className="mt-5 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-2xl font-black text-brand">{formatPrice(product.price)}</p>
+                      <p className="mt-1 text-xs text-muted">{product.optionGroups?.length || 0} 組客製化選項</p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <button className="btn-secondary py-2" onClick={() => editProduct(product)} type="button">編輯</button>
+                      <button className="btn-secondary py-2" onClick={() => toggleAvailable(product)} type="button">{product.isAvailable ? '下架' : '上架'}</button>
+                      <button className="btn-danger py-2" onClick={() => deleteProduct(product.id)} type="button">刪除</button>
+                    </div>
                   </div>
                 </div>
               </article>
