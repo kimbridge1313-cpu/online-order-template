@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Pencil, XCircle } from 'lucide-react'
+import { MapPin, Pencil, XCircle } from 'lucide-react'
 import OrderEditModal from '../components/OrderEditModal'
 import StatusBadge from '../components/StatusBadge'
 import { orderService } from '../services/orderService'
@@ -18,6 +18,10 @@ const tabs = [
 
 const diningLabels = { dine_in: '內用', takeaway: '自取', delivery: '外送', preorder: '預訂單' }
 const sourceLabels = { customer_online: '線上預約', counter: '門店點餐' }
+
+function googleMapsSearchUrl(query) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query || '')}`
+}
 
 export default function OrderManagementPage({ role: roleProp }) {
   const role = roleProp || readStorage(MOCK_ROLE_KEY, 'customer')
@@ -115,6 +119,7 @@ export default function OrderManagementPage({ role: roleProp }) {
             const expanded = expandedOrderId === order.id
             const isOnlineOrder = order.source === 'customer_online'
             const needsAccept = isOnlineOrder && order.status === 'pending'
+            const deliveryMapUrl = order.deliveryMapUrl || googleMapsSearchUrl(order.deliveryAddress || '')
             return (
               <article key={order.id} className="bg-white px-4 py-4">
                 <div className="grid gap-3 lg:grid-cols-[150px_1fr_120px_110px_130px_190px] lg:items-center">
@@ -132,7 +137,12 @@ export default function OrderManagementPage({ role: roleProp }) {
                   <div className="text-sm">
                     <p className="font-bold">{diningLabels[order.diningType] || order.diningType}</p>
                     {order.pickupTime && <p className="mt-1 text-xs text-muted">{order.pickupTime}</p>}
-                    {order.diningType === 'delivery' && order.deliveryAddress && <p className="mt-1 line-clamp-1 text-xs text-muted">{order.deliveryAddress}</p>}
+                    {order.diningType === 'delivery' && order.deliveryAddress && (
+                      <div className="mt-1 space-y-1">
+                        <p className="line-clamp-1 text-xs text-muted">{order.deliveryAddress}</p>
+                        <a className="inline-flex items-center gap-1 text-xs font-bold text-brand underline" href={deliveryMapUrl} target="_blank" rel="noreferrer"><MapPin size={13} /> 導航</a>
+                      </div>
+                    )}
                   </div>
 
                   <p className="text-lg font-black text-brand">{formatPrice(order.totalAmount)}</p>
@@ -153,7 +163,12 @@ export default function OrderManagementPage({ role: roleProp }) {
                       <p>門店：{order.store?.name || '未指定'}</p>
                       <p>來源：{sourceLabels[order.source] || order.source}</p>
                       <p>用餐方式：{diningLabels[order.diningType] || order.diningType}</p>
-                      {order.deliveryAddress && <p className="md:col-span-2">外送地址：{order.deliveryAddress}</p>}
+                      {order.deliveryAddress && (
+                        <p className="md:col-span-2">
+                          外送地址：{order.deliveryAddress}
+                          <a className="ml-3 inline-flex items-center gap-1 font-bold text-brand underline" href={deliveryMapUrl} target="_blank" rel="noreferrer"><MapPin size={14} /> 開啟導航</a>
+                        </p>
+                      )}
                       {order.acceptedAt && <p>接單時間：{new Date(order.acceptedAt).toLocaleString('zh-TW')}</p>}
                       {order.note && <p className="md:col-span-2">備註：{order.note}</p>}
                       {order.cancelReason && <p className="text-red-700 md:col-span-2">取消原因：{order.cancelReason}</p>}
