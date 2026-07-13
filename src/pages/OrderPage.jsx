@@ -73,7 +73,10 @@ export default function OrderPage() {
   const timeSettings = { ...defaultTimeSettings, ...(storeSettings.timeSettings || {}) }
   const diningOptions = allDiningTypes.filter((item) => diningModules[item.value])
   const activeDiningOptions = diningOptions.length > 0 ? diningOptions : allDiningTypes.slice(0, 1)
-  const timeOptions = [timeSettings.immediateEnabled ? { value: 'now', label: '立即' } : null, timeSettings.scheduledEnabled ? { value: 'scheduled', label: '預定' } : null].filter(Boolean)
+  const timeOptions = [
+    timeSettings.immediateEnabled ? { value: 'now', label: '立即' } : null,
+    timeSettings.scheduledEnabled ? { value: 'scheduled', label: '預定' } : null
+  ].filter(Boolean)
   const minScheduledDate = getDateAfter(timeSettings.preorderMinDays || 0)
   const freeDeliveryMinAmount = Number(deliverySettings.freeDeliveryMinAmount || 0)
   const maxDeliveryDistanceKm = Number(deliverySettings.maxDeliveryDistanceKm || 0)
@@ -207,7 +210,15 @@ export default function OrderPage() {
       pickupTime: getScheduledTime(),
       items: cartItems,
       totalAmount: calculateCartTotal(cartItems),
-      note: [selectedStore ? `門店：${selectedStore.name}` : '', timeType === 'now' ? '時間：立即' : `時間：${orderDate} ${orderTime}`, storeSettings.tableNumberEnabled && diningType === 'dine_in' && tableNumber ? `桌號：${tableNumber}` : '', diningType === 'delivery' && deliveryAddress.trim() ? `外送地址：${deliveryAddress.trim()}` : '', diningType === 'delivery' && selectedStoreDistanceKm !== null ? `外送距離：約 ${selectedStoreDistanceKm.toFixed(1)} km` : '', bagging ? '需要打包' : '不需打包', note ? `備註：${note}` : ''].filter(Boolean).join('｜')
+      note: [
+        selectedStore ? `門店：${selectedStore.name}` : '',
+        timeType === 'now' ? '時間：立即' : `時間：${orderDate} ${orderTime}`,
+        storeSettings.tableNumberEnabled && diningType === 'dine_in' && tableNumber ? `桌號：${tableNumber}` : '',
+        diningType === 'delivery' && deliveryAddress.trim() ? `外送地址：${deliveryAddress.trim()}` : '',
+        diningType === 'delivery' && selectedStoreDistanceKm !== null ? `外送距離：約 ${selectedStoreDistanceKm.toFixed(1)} km` : '',
+        bagging ? '需要打包' : '不需打包',
+        note ? `備註：${note}` : ''
+      ].filter(Boolean).join('｜')
     })
     setSuccessOrder(order)
     setCartItems([])
@@ -350,28 +361,30 @@ export default function OrderPage() {
 
   if (!isStore && checkoutStep === 'checkout') {
     return (
-      <div className="mx-auto max-w-2xl space-y-5 px-4 py-6">
-        <section className="card p-5">
-          <p className="text-xs font-semibold text-accent">Checkout</p>
-          <h1 className="mt-1 text-3xl font-black">確認訂單</h1>
-          <p className="mt-2 text-sm text-muted">確認購物車、門店、用餐方式、時間與訂單聯絡資料。</p>
-        </section>
-        <CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={submitOrder} submitLabel="送出訂單" />
-        {renderOrderOptionsPanel()}
-        <section className="card p-5">
-          <h2 className="font-black">訂單聯絡資料</h2>
-          <div className="mt-3 rounded-2xl bg-cream p-4 text-sm"><p className="font-bold">{profile.name}</p><p className="mt-1 text-muted">{profile.phone}</p></div>
-          <label className="mt-4 block space-y-1"><span className="label">訂單備註</span><textarea className="input min-h-24" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} /></label>
-        </section>
-        {message && <p className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
-        <button className="btn-secondary w-full" type="button" onClick={() => setCheckoutStep('ordering')}>返回修改商品</button>
+      <div className="mx-auto grid max-w-5xl gap-6 px-4 py-6 lg:grid-cols-[1fr_360px]">
+        <main className="space-y-5">
+          <section className="card p-5">
+            <p className="text-xs font-semibold text-accent">Checkout</p>
+            <h1 className="mt-1 text-3xl font-black">確認訂單</h1>
+            <p className="mt-2 text-sm text-muted">確認門店、用餐方式、用餐 / 取餐 / 外送時間與訂單聯絡資料。</p>
+          </section>
+          {renderOrderOptionsPanel()}
+          <section className="card p-5">
+            <h2 className="font-black">訂單聯絡資料</h2>
+            <div className="mt-3 rounded-2xl bg-cream p-4 text-sm"><p className="font-bold">{profile.name}</p><p className="mt-1 text-muted">{profile.phone}</p></div>
+            <label className="mt-4 block space-y-1"><span className="label">訂單備註</span><textarea className="input min-h-24" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} /></label>
+          </section>
+          {message && <p className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
+          <button className="btn-secondary" type="button" onClick={() => setCheckoutStep('ordering')}>返回修改商品</button>
+        </main>
+        <div className="space-y-4"><CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={submitOrder} submitLabel="送出訂單" /></div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-0 py-0 pb-32 lg:px-3 lg:py-4 lg:pb-4">
-      <main className={isStore ? 'space-y-3 px-3 lg:grid lg:grid-cols-[1fr_330px] lg:gap-4 lg:px-0' : 'space-y-0'}>
+    <div className="mx-auto max-w-7xl px-0 py-0 pb-32 md:px-3 md:py-4 md:pb-4">
+      <main className={isStore ? 'space-y-3 px-3 md:grid md:grid-cols-[1fr_340px] md:gap-4 md:px-0' : 'space-y-0'}>
         {!isStore && (
           <section className="grid h-[calc(100vh-73px)] grid-cols-[104px_1fr] overflow-hidden bg-white lg:h-[calc(100vh-81px)] lg:rounded-3xl lg:border lg:border-line">
             <aside className="overflow-y-auto border-r border-line bg-white pb-28">
@@ -392,16 +405,17 @@ export default function OrderPage() {
         {isStore && (
           <section className="space-y-3">
             <section className="card p-4"><p className="text-xs font-semibold text-accent">Counter Order</p><h1 className="mt-1 text-2xl font-black">門店櫃檯點餐</h1></section>
-            {renderOrderOptionsPanel()}
             <section className="card p-3">
               <div className="mb-3 flex items-center gap-2"><ShoppingBag size={18} className="text-accent" /><h2 className="font-black">商品</h2></div>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
                 {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact dense />)}
+                {visibleProducts.length === 0 && <p className="col-span-2 p-8 text-center text-sm text-muted md:col-span-3 xl:col-span-4">此分類目前沒有商品。</p>}
               </div>
             </section>
           </section>
         )}
-        <div className={isStore ? '' : 'fixed inset-x-0 bottom-0 z-30 border-t border-line bg-cream/95 p-3 backdrop-blur lg:static lg:border-0 lg:bg-transparent lg:p-0'}>
+        <div className={isStore ? 'space-y-3 md:sticky md:top-24 md:self-start' : 'fixed inset-x-0 bottom-0 z-30 border-t border-line bg-cream/95 p-3 backdrop-blur lg:static lg:border-0 lg:bg-transparent lg:p-0'}>
+          {isStore && renderOrderOptionsPanel()}
           <CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={goCheckout} submitLabel={isStore ? '建立櫃檯訂單' : '前往結帳'} compact={!isStore} />
           {message && <p className="mt-2 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
         </div>
