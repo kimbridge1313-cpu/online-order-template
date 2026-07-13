@@ -48,7 +48,6 @@ function AdminLoginPage({ onLogin }) {
   const [form, setForm] = useState({ username: '', password: '' })
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const canBootstrapOwner = authService.canBootstrapOwner()
 
   async function submit(event) {
     event.preventDefault()
@@ -59,20 +58,6 @@ function AdminLoginPage({ onLogin }) {
       onLogin(session)
     } catch (error) {
       setMessage(error.message || '登入失敗。')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  async function bootstrapOwner() {
-    if (!window.confirm('確定要建立第一個老闆帳號？建立後請到 Vercel 刪除初始化帳密環境參數。')) return
-    setMessage('')
-    setSubmitting(true)
-    try {
-      const session = await authService.bootstrapOwner()
-      onLogin(session)
-    } catch (error) {
-      setMessage(error.message || '初始化失敗。')
     } finally {
       setSubmitting(false)
     }
@@ -91,10 +76,6 @@ function AdminLoginPage({ onLogin }) {
         </div>
         {message && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
         <button className="btn-primary mt-5 w-full" type="submit" disabled={submitting}>{submitting ? '登入中...' : '登入後台'}</button>
-        {canBootstrapOwner && (
-          <button className="btn-secondary mt-3 w-full" type="button" onClick={bootstrapOwner} disabled={submitting}>建立第一個老闆帳號</button>
-        )}
-        {canBootstrapOwner && <p className="mt-3 text-xs leading-5 text-muted">初始化帳號建立後，請從 Vercel 移除初始化帳密環境參數。</p>}
       </form>
     </div>
   )
@@ -122,7 +103,7 @@ function AppShell() {
       writeStorage(ROLE_STORAGE_KEY, 'customer')
       setPage('order')
     }
-  }, [showTemplateRoleSwitch, isLoggedAdmin, adminSession, role])
+  }, [showTemplateRoleSwitch, isLoggedAdmin, role, adminSession])
 
   useEffect(() => {
     let mounted = true
@@ -141,14 +122,14 @@ function AppShell() {
   }, [])
 
   useEffect(() => {
-    function refreshSession() {
+    function refreshAdminSession() {
       setAdminSession(authService.getSession())
     }
-    window.addEventListener('admin-session-updated', refreshSession)
-    window.addEventListener('storage', refreshSession)
+    window.addEventListener('admin-session-updated', refreshAdminSession)
+    window.addEventListener('storage', refreshAdminSession)
     return () => {
-      window.removeEventListener('admin-session-updated', refreshSession)
-      window.removeEventListener('storage', refreshSession)
+      window.removeEventListener('admin-session-updated', refreshAdminSession)
+      window.removeEventListener('storage', refreshAdminSession)
     }
   }, [])
 
@@ -166,11 +147,11 @@ function AppShell() {
     if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
   }
 
-  function handleAdminLogin(session) {
+  function loginAdmin(session) {
     setAdminSession(session)
     setRole(session.role)
+    writeStorage(ROLE_STORAGE_KEY, session.role)
     setPage('order')
-    setOpen(false)
   }
 
   function logoutAdmin() {
@@ -193,11 +174,12 @@ function AppShell() {
     }
     return [
       { value: 'order', label: '訂餐頁', icon: ShoppingBag },
-      { value: 'orders', label: '我的訂單', icon: ClipboardList }
+      { value: 'orders', label: '我的訂單', icon: ClipboardList },
+      ...(showTemplateRoleSwitch ? [] : [{ value: 'admin-login', label: '後台登入', icon: UserRound }])
     ]
-  }, [isAdmin])
+  }, [isAdmin, showTemplateRoleSwitch])
 
-  const CurrentPage = page === 'admin-login' && !showTemplateRoleSwitch && !isLoggedAdmin
+  const CurrentPage = page === 'admin-login' && !isAdmin && !showTemplateRoleSwitch
     ? AdminLoginPage
     : page === 'orders'
       ? OrderManagementPage
@@ -234,7 +216,6 @@ function AppShell() {
                   </button>
                 )
               })}
-              {!showTemplateRoleSwitch && !isLoggedAdmin && <button className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === 'admin-login' ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button" onClick={() => setPage('admin-login')}><UserRound size={18} /> 後台登入</button>}
               {!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
             </nav>
           </div>
@@ -260,12 +241,11 @@ function AppShell() {
                 </button>
               )
             })}
-            {!showTemplateRoleSwitch && !isLoggedAdmin && <button className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === 'admin-login' ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button" onClick={() => { setPage('admin-login'); setOpen(false) }}><UserRound size={18} /> 後台登入</button>}
             {!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
           </nav>
         )}
       </header>
-      <CurrentPage key={`${role}-${page}`} role={role} onRoleChange={refreshRole} onLogin={handleAdminLogin} adminSession={adminSession} />
+      <CurrentPage key={`${role}-${page}`} role={role} onRoleChange={refreshRole} onLogin={loginAdmin} adminSession={adminSession} />
     </div>
   )
 }
