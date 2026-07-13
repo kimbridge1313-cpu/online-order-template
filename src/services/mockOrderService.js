@@ -23,6 +23,10 @@ export const mockOrderService = {
       id: `order-${Date.now()}`,
       orderNumber: createOrderNumber(),
       status: payload.source === 'counter' ? 'accepted' : 'pending',
+      paymentStatus: payload.paymentStatus || 'unpaid',
+      paymentMethod: payload.paymentMethod || '',
+      paidAt: payload.paidAt || '',
+      paidBy: payload.paidBy || '',
       createdAt: now,
       updatedAt: now
     }
@@ -45,6 +49,14 @@ export const mockOrderService = {
     })
     if (order && order.source === 'customer_online') await lineNotificationService.notifyAcceptedOrder(order)
     return order
+  },
+  async markOrderPaid(orderId, { paymentMethod = 'cash', paidBy = '' } = {}) {
+    return this.updateOrder(orderId, {
+      paymentStatus: 'paid',
+      paymentMethod,
+      paidBy,
+      paidAt: new Date().toISOString()
+    })
   },
   async cancelOrder(orderId, cancelReason = '') {
     const order = await this.updateOrder(orderId, {
