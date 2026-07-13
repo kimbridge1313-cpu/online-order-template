@@ -15,13 +15,25 @@ function getBusinessDate(date = new Date()) {
   return date.toISOString().slice(0, 10)
 }
 
-function isSameBusinessDate(order, businessDate) {
+function isSamePaidDate(order, businessDate) {
+  return order.paidAt?.slice(0, 10) === businessDate
+}
+
+function isSameCreatedDate(order, businessDate) {
   return order.createdAt?.slice(0, 10) === businessDate
 }
 
 function isSameStore(order, storeId) {
   if (!storeId || storeId === 'all') return true
   return order.store?.id === storeId || order.storeId === storeId
+}
+
+function isPaidOrder(order) {
+  return order.status !== 'cancelled' && order.paymentStatus === 'paid'
+}
+
+function isUnpaidOnlineOrder(order) {
+  return order.status !== 'cancelled' && order.source === 'customer_online' && order.paymentStatus !== 'paid'
 }
 
 function summarizeOrders(orders) {
@@ -69,14 +81,17 @@ export const mockDailyClosingService = {
 
   async getSummary({ businessDate = getBusinessDate(), storeId = 'all' } = {}) {
     const orders = await orderService.listOrders()
-    const filteredOrders = orders.filter((order) => isSameBusinessDate(order, businessDate) && isSameStore(order, storeId))
+    const paidOrders = orders.filter((order) => isPaidOrder(order) && isSamePaidDate(order, businessDate) && isSameStore(order, storeId))
+    const unpaidOnlineOrders = orders.filter((order) => isUnpaidOnlineOrder(order) && isSameCreatedDate(order, businessDate) && isSameStore(order, storeId))
     const existingClosing = list().find((record) => record.businessDate === businessDate && record.storeId === storeId)
     return {
       businessDate,
       storeId,
-      orders: filteredOrders,
+      orders: paidOrders,
+      unpaidOnlineOrders,
+      unpaidOnlineAmount: unpaidOnlineOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0),
       existingClosing,
-      ...summarizeOrders(filteredOrders)
+      ...summarizeOrders(paidOrders)
     }
   },
 
@@ -102,6 +117,8 @@ export const mockDailyClosingService = {
       netSales: summary.netSales,
       averageOrderAmount: summary.averageOrderAmount,
       cashBaseAmount: summary.cashBaseAmount,
+      unpaidOnlineOrderCount: summary.unpaidOnlineOrders.length,
+      unpaidOnlineAmount: summary.unpaidOnlineAmount,
       manualAdjustments: normalizedAdjustments,
       manualAdjustmentTotal,
       cashExpected,
