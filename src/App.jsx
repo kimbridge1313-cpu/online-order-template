@@ -74,7 +74,7 @@ function AdminLoginPage({ onLogin }) {
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cream text-brand"><UserRound size={24} /></div>
         <p className="mt-5 text-xs font-semibold text-accent">Management</p>
         <h1 className="mt-1 text-3xl font-black">管理入口</h1>
-        <p className="mt-3 text-sm leading-6 text-muted">第一次綁定或需要備援時，請使用帳號密碼進入。之後系統會依登入狀態自動顯示管理介面。</p>
+        <p className="mt-3 text-sm leading-6 text-muted">第一次綁定或需要備援時，請使用帳號密碼進入。之後系統會依 LINE 身份自動顯示管理介面。</p>
         <div className="mt-5 space-y-3">
           <label className="block space-y-1"><span className="label">帳號</span><input className="input" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} autoComplete="username" required /></label>
           <label className="block space-y-1"><span className="label">密碼</span><input className="input" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="current-password" required /></label>
@@ -94,6 +94,7 @@ function AppShell() {
   const [role, setRole] = useState(() => showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : authService.getSession()?.role || 'customer')
   const [adminSession, setAdminSession] = useState(() => authService.getSession())
   const [storeSettings, setStoreSettings] = useState({ brandName: env.storeName })
+  const [lineChecking, setLineChecking] = useState(false)
   const isLoggedAdmin = authService.isAdminSession(adminSession)
   const isAdmin = showTemplateRoleSwitch ? role === 'store' || role === 'owner' : isLoggedAdmin && (role === 'store' || role === 'owner')
   const shouldShowAdminLogin = adminRoute && !isAdmin && !showTemplateRoleSwitch
@@ -111,6 +112,28 @@ function AppShell() {
       setPage('order')
     }
   }, [showTemplateRoleSwitch, isLoggedAdmin, role, adminSession])
+
+  useEffect(() => {
+    if (showTemplateRoleSwitch || isLoggedAdmin || !env.isLiffEnabled) return
+    let mounted = true
+    async function loginByLine() {
+      setLineChecking(true)
+      try {
+        const session = await authService.loginWithLineProfile()
+        if (!mounted || !session) return
+        setAdminSession(session)
+        setRole(session.role)
+        writeStorage(ROLE_STORAGE_KEY, session.role)
+        setPage('order')
+      } catch (error) {
+        console.warn('LINE auto admin login skipped:', error)
+      } finally {
+        if (mounted) setLineChecking(false)
+      }
+    }
+    loginByLine()
+    return () => { mounted = false }
+  }, [showTemplateRoleSwitch, isLoggedAdmin])
 
   useEffect(() => {
     let mounted = true
@@ -205,6 +228,7 @@ function AppShell() {
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-accent">{brandName}</p>
             <h1 className="truncate text-lg font-black text-ink">{env.appName}</h1>
+            {lineChecking && <p className="mt-1 text-[11px] font-semibold text-muted">正在確認 LINE 身份...</p>}
           </div>
           <div className="hidden items-center gap-2 md:flex">
             {showTemplateRoleSwitch && (
