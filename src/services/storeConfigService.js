@@ -11,8 +11,8 @@ const SETTINGS_DOC_ID = 'storeSettings'
 const STORES_COLLECTION = 'stores'
 
 const defaultDiningModules = { dine_in: true, takeaway: true, delivery: false }
-const defaultDeliverySettings = { freeDeliveryThreshold: 0, maxDeliveryDistanceKm: 0 }
-const defaultTimeSettings = { allowNow: true, allowScheduled: true, scheduledLeadDays: 0 }
+const defaultDeliverySettings = { freeDeliveryMinAmount: 0, maxDeliveryDistanceKm: 0 }
+const defaultTimeSettings = { immediateEnabled: true, scheduledEnabled: true, preorderMinDays: 0 }
 
 export const defaultStoreSettings = {
   brandName: '示範店家',
