@@ -10,7 +10,13 @@ function cleanOrder(order) {
 }
 
 function defaultPaymentStatus(payload = {}) {
-  return payload.paymentStatus || 'unpaid'
+  if (payload.paymentStatus) return payload.paymentStatus
+  return payload.source === 'counter' ? 'paid' : 'unpaid'
+}
+
+function defaultPaidAt(payload = {}, now = '') {
+  if (payload.paidAt) return payload.paidAt
+  return payload.source === 'counter' ? now : ''
 }
 
 export const firebaseOrderService = {
@@ -30,9 +36,9 @@ export const firebaseOrderService = {
       orderNumber: createOrderNumber(),
       status: payload.source === 'counter' ? 'accepted' : 'pending',
       paymentStatus: defaultPaymentStatus(payload),
-      paymentMethod: payload.paymentMethod || '',
-      paidAt: payload.paidAt || '',
-      paidBy: payload.paidBy || '',
+      paymentMethod: payload.paymentMethod || (payload.source === 'counter' ? 'cash' : ''),
+      paidAt: defaultPaidAt(payload, now),
+      paidBy: payload.paidBy || (payload.source === 'counter' ? '門店帳號' : ''),
       createdAt: now,
       updatedAt: now
     })
