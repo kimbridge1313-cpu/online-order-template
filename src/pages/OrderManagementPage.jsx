@@ -19,6 +19,12 @@ const tabs = [
 const diningLabels = { dine_in: '內用', takeaway: '自取', delivery: '外送', preorder: '預訂單' }
 const sourceLabels = { customer_online: '線上預約', counter: '門店點餐' }
 const customerCancellableStatuses = ['pending', 'accepted']
+const paymentLabels = { unpaid: '未收款', paid: '已收款', refunded: '已退款' }
+const paymentMethodLabels = { cash: '現金', linepay: 'LINE Pay', transfer: '轉帳', other: '其他' }
+
+function getPaymentStatus(order) {
+  return order.paymentStatus || 'unpaid'
+}
 
 export default function OrderManagementPage({ role: roleProp }) {
   const role = roleProp || readStorage(MOCK_ROLE_KEY, 'customer')
@@ -53,6 +59,14 @@ export default function OrderManagementPage({ role: roleProp }) {
   async function acceptOrder(orderId) {
     if (!isStore) return
     await orderService.acceptOrder(orderId)
+    await loadOrders()
+  }
+
+  async function markPaid(order) {
+    if (!isStore) return
+    const method = window.prompt('收款方式：cash 現金 / linepay LINE Pay / transfer 轉帳 / other 其他', order.paymentMethod || 'cash') || 'cash'
+    const normalizedMethod = ['cash', 'linepay', 'transfer', 'other'].includes(method) ? method : 'other'
+    await orderService.markOrderPaid(order.id, { paymentMethod: normalizedMethod, paidBy: role })
     await loadOrders()
   }
 
@@ -97,12 +111,12 @@ export default function OrderManagementPage({ role: roleProp }) {
       </section>
 
       <section className="card mt-6 overflow-hidden">
-        <div className="hidden grid-cols-[150px_1fr_120px_110px_130px_210px] gap-3 border-b border-line bg-cream px-4 py-3 text-xs font-bold text-muted lg:grid">
+        <div className="hidden grid-cols-[150px_1fr_120px_130px_150px_230px] gap-3 border-b border-line bg-cream px-4 py-3 text-xs font-bold text-muted lg:grid">
           <span>訂單</span>
           <span>顧客 / 品項</span>
           <span>用餐</span>
           <span>金額</span>
-          <span>狀態</span>
+          <span>狀態 / 收款</span>
           <span>操作</span>
         </div>
 
@@ -112,10 +126,12 @@ export default function OrderManagementPage({ role: roleProp }) {
             const expanded = expandedOrderId === order.id
             const isOnlineOrder = order.source === 'customer_online'
             const needsAccept = isOnlineOrder && order.status === 'pending'
+            const paymentStatus = getPaymentStatus(order)
+            const needsPayment = isStore && order.status !== 'pending' && order.status !== 'cancelled' && paymentStatus !== 'paid'
             const canCustomerCancel = !isStore && customerCancellableStatuses.includes(order.status)
             return (
               <article key={order.id} className="bg-white px-4 py-4">
-                <div className="grid gap-3 lg:grid-cols-[150px_1fr_120px_110px_130px_210px] lg:items-center">
+                <div className="grid gap-3 lg:grid-cols-[150px_1fr_120px_130px_150px_230px] lg:items-center">
                   <button className="text-left" type="button" onClick={() => setExpandedOrderId(expanded ? null : order.id)}>
                     <p className="font-black text-ink">{order.orderNumber}</p>
                     <p className="mt-1 text-xs text-muted">{new Date(order.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</p>
@@ -134,10 +150,18 @@ export default function OrderManagementPage({ role: roleProp }) {
                   </div>
 
                   <p className="text-lg font-black text-brand">{formatPrice(order.totalAmount)}</p>
-                  <StatusBadge status={order.status} />
+
+                  <div className="space-y-1">
+                    <StatusBadge status={order.status} />
+                    <p className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${paymentStatus === 'paid' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {paymentLabels[paymentStatus] || paymentStatus}
+                    </p>
+                    {order.paymentMethod && <p className="text-xs text-muted">{paymentMethodLabels[order.paymentMethod] || order.paymentMethod}</p>}
+                  </div>
 
                   <div className="flex flex-wrap gap-2">
                     {isStore && needsAccept && <button className="btn-secondary py-2" type="button" onClick={() => acceptOrder(order.id)}>接單</button>}
+                    {needsPayment && <button className="btn-primary py-2" type="button" onClick={() => markPaid(order)}>收款</button>}
                     {isStore && order.status !== 'cancelled' && order.status !== 'completed' && <button className="btn-secondary py-2" type="button" onClick={() => setEditingOrder(order)}><Pencil size={15} className="inline-block" /> 修改</button>}
                     {isStore && order.status !== 'cancelled' && <button className="btn-danger py-2" type="button" onClick={() => cancelOrder(order.id)}><XCircle size={15} className="inline-block" /> 取消</button>}
                     {!isStore && <button className="btn-secondary py-2" type="button" onClick={() => setExpandedOrderId(expanded ? null : order.id)}>{expanded ? '收合' : '明細'}</button>}
@@ -152,6 +176,8 @@ export default function OrderManagementPage({ role: roleProp }) {
                       <p>門店：{order.store?.name || '未指定'}</p>
                       <p>來源：{sourceLabels[order.source] || order.source}</p>
                       <p>用餐方式：{diningLabels[order.diningType] || order.diningType}</p>
+                      <p>收款狀態：{paymentLabels[paymentStatus] || paymentStatus}{order.paymentMethod ? `｜${paymentMethodLabels[order.paymentMethod] || order.paymentMethod}` : ''}</p>
+                      {order.paidAt && <p>收款時間：{new Date(order.paidAt).toLocaleString('zh-TW')}</p>}
                       {order.deliveryAddress && <p className="md:col-span-2">外送地址：{order.deliveryAddress}</p>}
                       {order.acceptedAt && <p>接單時間：{new Date(order.acceptedAt).toLocaleString('zh-TW')}</p>}
                       {order.note && <p className="md:col-span-2">備註：{order.note}</p>}
