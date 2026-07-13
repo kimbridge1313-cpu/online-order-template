@@ -54,6 +54,7 @@ export default function DailyClosingPage({ role: roleProp }) {
   const isOwner = role === 'owner'
   const stores = readStorage(STORE_LIST_KEY, defaultStores).filter((store) => store.isActive !== false)
   const firstStore = stores[0] || defaultStores[0]
+  const [activeTab, setActiveTab] = useState('today')
   const [businessDate, setBusinessDate] = useState(getTodayDate())
   const [storeId, setStoreId] = useState(isOwner ? 'all' : firstStore.id)
   const [summary, setSummary] = useState(null)
@@ -66,6 +67,12 @@ export default function DailyClosingPage({ role: roleProp }) {
   const [salesRangeStart, setSalesRangeStart] = useState(getMonthStartDate())
   const [salesRangeEnd, setSalesRangeEnd] = useState(getTodayDate())
   const [salesStoreId, setSalesStoreId] = useState('all')
+
+  const tabs = [
+    { value: 'today', label: '今日結帳' },
+    ...(isOwner ? [{ value: 'report', label: '期間統計' }] : []),
+    { value: 'history', label: '歷史日結' }
+  ]
 
   const selectedStore = useMemo(() => {
     if (storeId === 'all') return { id: 'all', name: '全部門店' }
@@ -147,6 +154,7 @@ export default function DailyClosingPage({ role: roleProp }) {
     setStoreId(record.storeId)
     setCashActual(String(record.cashActual || 0))
     setNote(record.note || '')
+    setActiveTab('today')
     setMessage(`已載入 ${record.businessDate} ${record.storeName}，修正後按「確認結帳」即可覆蓋。`)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -184,34 +192,133 @@ export default function DailyClosingPage({ role: roleProp }) {
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-black">每日結帳</h1>
-            <p className="mt-2 text-sm text-muted">日結只統計今日已收款訂單；線上未付款訂單會放在左側待收款，打勾收款後自動加入今日明細。</p>
+            <p className="mt-2 text-sm text-muted">今日結帳、期間統計、歷史日結已拆成分頁，避免同一頁資訊過多。</p>
           </div>
           <button className="btn-secondary" type="button" onClick={loadData}><RefreshCw size={16} className="inline-block" /> 重新整理</button>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-[220px_1fr]">
-          <label className="space-y-1">
-            <span className="label">營業日期</span>
-            <input className="input" type="date" value={businessDate} onChange={(event) => setBusinessDate(event.target.value)} />
-          </label>
-          <label className="space-y-1">
-            <span className="label">門店</span>
-            <select className="input" value={storeId} onChange={(event) => setStoreId(event.target.value)} disabled={!isOwner}>
-              {isOwner && <option value="all">全部門店</option>}
-              {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
-            </select>
-          </label>
+        <div className="mt-5 grid gap-2 rounded-3xl bg-cream p-2 md:inline-grid md:grid-flow-col">
+          {tabs.map((tab) => (
+            <button key={tab.value} className={`rounded-2xl px-4 py-3 text-sm font-black ${activeTab === tab.value ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setActiveTab(tab.value)}>
+              {tab.label}
+            </button>
+          ))}
         </div>
       </section>
 
-      {isOwner && salesReport && (
-        <section className="card mt-5 p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-accent">Owner Report</p>
-              <h2 className="mt-1 text-2xl font-black">指定期間營業額</h2>
-              <p className="mt-1 text-sm text-muted">依收款日期 paidAt 統計；只計入已收款且未取消的訂單。</p>
+      {activeTab === 'today' && (
+        <>
+          <section className="card mt-5 p-5">
+            <div className="grid gap-3 md:grid-cols-[220px_1fr]">
+              <label className="space-y-1">
+                <span className="label">營業日期</span>
+                <input className="input" type="date" value={businessDate} onChange={(event) => setBusinessDate(event.target.value)} />
+              </label>
+              <label className="space-y-1">
+                <span className="label">門店</span>
+                <select className="input" value={storeId} onChange={(event) => setStoreId(event.target.value)} disabled={!isOwner}>
+                  {isOwner && <option value="all">全部門店</option>}
+                  {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+                </select>
+              </label>
             </div>
+          </section>
+
+          {summary && (
+            <>
+              {summary.existingClosing && (
+                <section className="mt-5 rounded-3xl border border-green-200 bg-green-50 p-4 text-green-800">
+                  <div className="flex items-center gap-2 font-bold"><CheckCircle2 size={18} /> 此日期已有日結紀錄，可直接修正後重新確認結帳覆蓋。</div>
+                  <p className="mt-1 text-sm">結帳時間：{new Date(summary.existingClosing.closedAt).toLocaleString('zh-TW')}｜差額：{formatPrice(summary.existingClosing.cashDifference)}</p>
+                </section>
+              )}
+
+              <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard label="今日已收款訂單" value={summary.orderCount} sub={`線上 ${summary.onlineOrderCount}｜門店 ${summary.counterOrderCount}`} />
+                <StatCard label="今日實收金額" value={formatPrice(summary.netSales)} sub="以 paidAt 為今日計算" />
+                <StatCard label="線上待收款" value={(summary.unpaidOnlineOrders || []).length} sub={formatPrice(summary.unpaidOnlineAmount || 0)} />
+                <StatCard label="平均客單價" value={formatPrice(summary.averageOrderAmount)} sub="以已收款訂單計算" />
+              </section>
+
+              <section className="mt-5 grid gap-5 lg:grid-cols-[300px_1fr_380px]">
+                <aside className="card h-fit p-5 lg:sticky lg:top-24">
+                  <h2 className="text-xl font-black">線上待收款</h2>
+                  <p className="mt-1 text-sm text-muted">客人今天來付帳時，點打勾收款；系統會把它加入今日訂單明細。</p>
+                  <div className="mt-4 space-y-3">
+                    {(summary.unpaidOnlineOrders || []).map((order) => (
+                      <div key={order.id} className="rounded-3xl border border-line bg-white p-3 text-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-black">{order.orderNumber}</p>
+                            <p className="mt-1 text-xs text-muted">{order.customer?.name || '未填姓名'}</p>
+                          </div>
+                          <p className="font-black text-brand">{formatPrice(order.totalAmount)}</p>
+                        </div>
+                        <button className="btn-primary mt-3 w-full py-2" type="button" onClick={() => setCollectingOrder(order)}>✓ 收款</button>
+                      </div>
+                    ))}
+                    {(summary.unpaidOnlineOrders || []).length === 0 && <p className="rounded-2xl bg-white p-4 text-sm text-muted">目前沒有線上待收款訂單。</p>}
+                  </div>
+                </aside>
+
+                <div className="card p-5">
+                  <h2 className="text-xl font-black">今日訂單明細</h2>
+                  <p className="mt-1 text-sm text-muted">只顯示今日已收款訂單。線上訂單誤按已收款時，可以在這裡取消收款。</p>
+                  <div className="mt-3 divide-y divide-line rounded-3xl border border-line bg-white">
+                    {summary.orders.map((order) => (
+                      <div key={order.id} className="grid gap-2 p-3 text-sm md:grid-cols-[140px_1fr_120px_104px] md:items-center">
+                        <div>
+                          <p className="font-black">{order.orderNumber}</p>
+                          <p className="text-xs text-muted">{order.paidAt ? new Date(order.paidAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
+                        </div>
+                        <p className="text-muted">{order.customer?.name || '門店櫃檯'}｜{order.source === 'customer_online' ? '線上' : '門店'}｜{paymentMethodLabels[order.paymentMethod] || '現金'}</p>
+                        <p className="font-black text-brand">{formatPrice(order.totalAmount)}</p>
+                        {order.source === 'customer_online' ? (
+                          <button className="btn-secondary py-2 text-xs" type="button" onClick={() => undoPaid(order)}>取消收款</button>
+                        ) : <span className="text-xs text-muted">櫃檯單</span>}
+                      </div>
+                    ))}
+                    {summary.orders.length === 0 && <p className="p-6 text-center text-sm text-muted">此日期目前沒有已收款訂單。</p>}
+                  </div>
+                </div>
+
+                <aside className="card h-fit p-5 lg:sticky lg:top-24">
+                  <h2 className="text-xl font-black">結帳對帳</h2>
+                  <div className="mt-4 space-y-3 rounded-3xl bg-cream p-4">
+                    <div className="flex justify-between gap-3"><span className="text-muted">系統應收</span><strong>{formatPrice(cashExpected)}</strong></div>
+                    <div className="flex justify-between gap-3"><span className="text-muted">線上待收款</span><strong>{formatPrice(summary.unpaidOnlineAmount || 0)}</strong></div>
+                    <div className="flex justify-between gap-3 border-t border-line pt-3"><span className="font-bold">今日已收款合計</span><strong>{formatPrice(summary.netSales)}</strong></div>
+                  </div>
+
+                  <label className="mt-4 block space-y-1">
+                    <span className="label">實點現金 / 今日實收</span>
+                    <input className="input" type="number" min="0" value={cashActual} onChange={(event) => setCashActual(event.target.value)} />
+                  </label>
+                  <div className="mt-3 flex justify-between gap-3 rounded-3xl bg-cream p-4">
+                    <span className="font-bold">差額</span>
+                    <strong className={cashDifference < 0 ? 'text-red-600' : 'text-brand'}>{formatPrice(cashDifference)}</strong>
+                  </div>
+
+                  <label className="mt-4 block space-y-1">
+                    <span className="label">日結備註</span>
+                    <textarea className="input min-h-24" value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：現金短少、補登說明" />
+                  </label>
+                  {message && <p className="mt-4 rounded-2xl bg-green-50 p-3 text-sm font-semibold text-green-700">{message}</p>}
+                  <button className="btn-primary mt-4 w-full" type="button" onClick={closeDay}>{summary.existingClosing ? '儲存修改' : '確認結帳'}</button>
+                  <p className="mt-3 text-xs leading-5 text-muted">同日重新結帳會覆蓋同日期、同門店的日結紀錄；歷史日結也可以載入修改或刪除。</p>
+                </aside>
+              </section>
+            </>
+          )}
+        </>
+      )}
+
+      {activeTab === 'report' && isOwner && salesReport && (
+        <section className="card mt-5 p-5">
+          <div>
+            <p className="text-xs font-semibold text-accent">Owner Report</p>
+            <h2 className="mt-1 text-2xl font-black">指定期間營業額</h2>
+            <p className="mt-1 text-sm text-muted">依收款日期 paidAt 統計；只計入已收款且未取消的訂單。</p>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-[180px_180px_1fr]">
             <label className="space-y-1">
@@ -239,112 +346,28 @@ export default function DailyClosingPage({ role: roleProp }) {
         </section>
       )}
 
-      {summary && (
-        <>
-          {summary.existingClosing && (
-            <section className="mt-5 rounded-3xl border border-green-200 bg-green-50 p-4 text-green-800">
-              <div className="flex items-center gap-2 font-bold"><CheckCircle2 size={18} /> 此日期已有日結紀錄，可直接修正後重新確認結帳覆蓋。</div>
-              <p className="mt-1 text-sm">結帳時間：{new Date(summary.existingClosing.closedAt).toLocaleString('zh-TW')}｜差額：{formatPrice(summary.existingClosing.cashDifference)}</p>
-            </section>
-          )}
-
-          <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="今日已收款訂單" value={summary.orderCount} sub={`線上 ${summary.onlineOrderCount}｜門店 ${summary.counterOrderCount}`} />
-            <StatCard label="今日實收金額" value={formatPrice(summary.netSales)} sub="以 paidAt 為今日計算" />
-            <StatCard label="線上待收款" value={(summary.unpaidOnlineOrders || []).length} sub={formatPrice(summary.unpaidOnlineAmount || 0)} />
-            <StatCard label="平均客單價" value={formatPrice(summary.averageOrderAmount)} sub="以已收款訂單計算" />
-          </section>
-
-          <section className="mt-5 grid gap-5 lg:grid-cols-[300px_1fr_380px]">
-            <aside className="card h-fit p-5 lg:sticky lg:top-24">
-              <h2 className="text-xl font-black">線上待收款</h2>
-              <p className="mt-1 text-sm text-muted">客人今天來付帳時，點打勾收款；系統會把它加入今日訂單明細。</p>
-              <div className="mt-4 space-y-3">
-                {(summary.unpaidOnlineOrders || []).map((order) => (
-                  <div key={order.id} className="rounded-3xl border border-line bg-white p-3 text-sm">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-black">{order.orderNumber}</p>
-                        <p className="mt-1 text-xs text-muted">{order.customer?.name || '未填姓名'}</p>
-                      </div>
-                      <p className="font-black text-brand">{formatPrice(order.totalAmount)}</p>
-                    </div>
-                    <button className="btn-primary mt-3 w-full py-2" type="button" onClick={() => setCollectingOrder(order)}>✓ 收款</button>
-                  </div>
-                ))}
-                {(summary.unpaidOnlineOrders || []).length === 0 && <p className="rounded-2xl bg-white p-4 text-sm text-muted">目前沒有線上待收款訂單。</p>}
+      {activeTab === 'history' && (
+        <section className="card mt-5 p-5">
+          <h2 className="text-xl font-black">歷史日結</h2>
+          <p className="mt-1 text-sm text-muted">可載入修改或刪除誤產生的日結紀錄。</p>
+          <div className="mt-4 divide-y divide-line rounded-3xl border border-line bg-white">
+            {closings.filter((record) => isOwner || record.storeId === storeId).slice(0, 12).map((record) => (
+              <div key={record.id} className="grid gap-2 p-3 text-sm md:grid-cols-[130px_1fr_120px_120px_160px_150px] md:items-center">
+                <p className="font-black">{record.businessDate}</p>
+                <p className="text-muted">{record.storeName}</p>
+                <p>實收：<strong>{formatPrice(record.netSales)}</strong></p>
+                <p>差額：<strong className={record.cashDifference < 0 ? 'text-red-600' : 'text-brand'}>{formatPrice(record.cashDifference)}</strong></p>
+                <p className="text-xs text-muted">{new Date(record.closedAt).toLocaleString('zh-TW')}</p>
+                <div className="flex gap-2">
+                  <button className="btn-secondary py-2 text-xs" type="button" onClick={() => editClosing(record)}>修改</button>
+                  <button className="rounded-2xl p-2 text-red-600 hover:bg-red-50" type="button" onClick={() => deleteClosing(record)} aria-label="刪除日結"><Trash2 size={16} /></button>
+                </div>
               </div>
-            </aside>
-
-            <div className="card p-5">
-              <h2 className="text-xl font-black">今日訂單明細</h2>
-              <p className="mt-1 text-sm text-muted">只顯示今日已收款訂單。線上訂單誤按已收款時，可以在這裡取消收款。</p>
-              <div className="mt-3 divide-y divide-line rounded-3xl border border-line bg-white">
-                {summary.orders.map((order) => (
-                  <div key={order.id} className="grid gap-2 p-3 text-sm md:grid-cols-[140px_1fr_120px_104px] md:items-center">
-                    <div>
-                      <p className="font-black">{order.orderNumber}</p>
-                      <p className="text-xs text-muted">{order.paidAt ? new Date(order.paidAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
-                    </div>
-                    <p className="text-muted">{order.customer?.name || '門店櫃檯'}｜{order.source === 'customer_online' ? '線上' : '門店'}｜{paymentMethodLabels[order.paymentMethod] || '現金'}</p>
-                    <p className="font-black text-brand">{formatPrice(order.totalAmount)}</p>
-                    {order.source === 'customer_online' ? (
-                      <button className="btn-secondary py-2 text-xs" type="button" onClick={() => undoPaid(order)}>取消收款</button>
-                    ) : <span className="text-xs text-muted">櫃檯單</span>}
-                  </div>
-                ))}
-                {summary.orders.length === 0 && <p className="p-6 text-center text-sm text-muted">此日期目前沒有已收款訂單。</p>}
-              </div>
-            </div>
-
-            <aside className="card h-fit p-5 lg:sticky lg:top-24">
-              <h2 className="text-xl font-black">結帳對帳</h2>
-              <div className="mt-4 space-y-3 rounded-3xl bg-cream p-4">
-                <div className="flex justify-between gap-3"><span className="text-muted">系統應收</span><strong>{formatPrice(cashExpected)}</strong></div>
-                <div className="flex justify-between gap-3"><span className="text-muted">線上待收款</span><strong>{formatPrice(summary.unpaidOnlineAmount || 0)}</strong></div>
-                <div className="flex justify-between gap-3 border-t border-line pt-3"><span className="font-bold">今日已收款合計</span><strong>{formatPrice(summary.netSales)}</strong></div>
-              </div>
-
-              <label className="mt-4 block space-y-1">
-                <span className="label">實點現金 / 今日實收</span>
-                <input className="input" type="number" min="0" value={cashActual} onChange={(event) => setCashActual(event.target.value)} />
-              </label>
-              <div className="mt-3 flex justify-between gap-3 rounded-3xl bg-cream p-4">
-                <span className="font-bold">差額</span>
-                <strong className={cashDifference < 0 ? 'text-red-600' : 'text-brand'}>{formatPrice(cashDifference)}</strong>
-              </div>
-
-              <label className="mt-4 block space-y-1">
-                <span className="label">日結備註</span>
-                <textarea className="input min-h-24" value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：現金短少、補登說明" />
-              </label>
-              {message && <p className="mt-4 rounded-2xl bg-green-50 p-3 text-sm font-semibold text-green-700">{message}</p>}
-              <button className="btn-primary mt-4 w-full" type="button" onClick={closeDay}>{summary.existingClosing ? '儲存修改' : '確認結帳'}</button>
-              <p className="mt-3 text-xs leading-5 text-muted">同日重新結帳會覆蓋同日期、同門店的日結紀錄；歷史日結也可以載入修改或刪除。</p>
-            </aside>
-          </section>
-        </>
+            ))}
+            {closings.length === 0 && <p className="p-6 text-center text-sm text-muted">尚未產生日結紀錄。</p>}
+          </div>
+        </section>
       )}
-
-      <section className="card mt-5 p-5">
-        <h2 className="text-xl font-black">歷史日結</h2>
-        <div className="mt-4 divide-y divide-line rounded-3xl border border-line bg-white">
-          {closings.filter((record) => isOwner || record.storeId === storeId).slice(0, 12).map((record) => (
-            <div key={record.id} className="grid gap-2 p-3 text-sm md:grid-cols-[130px_1fr_120px_120px_160px_150px] md:items-center">
-              <p className="font-black">{record.businessDate}</p>
-              <p className="text-muted">{record.storeName}</p>
-              <p>實收：<strong>{formatPrice(record.netSales)}</strong></p>
-              <p>差額：<strong className={record.cashDifference < 0 ? 'text-red-600' : 'text-brand'}>{formatPrice(record.cashDifference)}</strong></p>
-              <p className="text-xs text-muted">{new Date(record.closedAt).toLocaleString('zh-TW')}</p>
-              <div className="flex gap-2">
-                <button className="btn-secondary py-2 text-xs" type="button" onClick={() => editClosing(record)}>修改</button>
-                <button className="rounded-2xl p-2 text-red-600 hover:bg-red-50" type="button" onClick={() => deleteClosing(record)} aria-label="刪除日結"><Trash2 size={16} /></button>
-              </div>
-            </div>
-          ))}
-          {closings.length === 0 && <p className="p-6 text-center text-sm text-muted">尚未產生日結紀錄。</p>}
-        </div>
-      </section>
 
       {collectingOrder && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 md:items-center md:p-6">
