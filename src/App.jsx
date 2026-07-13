@@ -48,6 +48,7 @@ function AdminLoginPage({ onLogin }) {
   const [form, setForm] = useState({ username: '', password: '' })
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const canBootstrapOwner = authService.canBootstrapOwner()
 
   async function submit(event) {
     event.preventDefault()
@@ -58,6 +59,20 @@ function AdminLoginPage({ onLogin }) {
       onLogin(session)
     } catch (error) {
       setMessage(error.message || '登入失敗。')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function bootstrapOwner() {
+    if (!window.confirm('確定要建立第一個老闆帳號？建立後請到 Vercel 刪除初始化帳密環境參數。')) return
+    setMessage('')
+    setSubmitting(true)
+    try {
+      const session = await authService.bootstrapOwner()
+      onLogin(session)
+    } catch (error) {
+      setMessage(error.message || '初始化失敗。')
     } finally {
       setSubmitting(false)
     }
@@ -76,6 +91,10 @@ function AdminLoginPage({ onLogin }) {
         </div>
         {message && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
         <button className="btn-primary mt-5 w-full" type="submit" disabled={submitting}>{submitting ? '登入中...' : '登入後台'}</button>
+        {canBootstrapOwner && (
+          <button className="btn-secondary mt-3 w-full" type="button" onClick={bootstrapOwner} disabled={submitting}>建立第一個老闆帳號</button>
+        )}
+        {canBootstrapOwner && <p className="mt-3 text-xs leading-5 text-muted">初始化帳號建立後，請從 Vercel 移除初始化帳密環境參數。</p>}
       </form>
     </div>
   )
