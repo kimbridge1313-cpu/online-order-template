@@ -1,11 +1,10 @@
 import { Component, useEffect, useMemo, useState } from 'react'
-import { Calculator, ClipboardList, LogOut, Menu, Package, QrCode, Settings, ShoppingBag, UserPlus, UserRound } from 'lucide-react'
+import { Calculator, ClipboardList, LogOut, Menu, Package, QrCode, Settings, ShoppingBag, UserRound } from 'lucide-react'
 import OrderPage from './pages/OrderPage'
 import OrderManagementPage from './pages/OrderManagementPage'
 import ProductManagementPage from './pages/ProductManagementPage'
 import StoreSettingsPage from './pages/StoreSettingsPage'
 import DailyClosingPage from './pages/DailyClosingPage'
-import AdminInvitePage from './pages/AdminInvitePage'
 import AdminInviteAcceptPage from './pages/AdminInviteAcceptPage'
 import { env } from './config/env'
 import { storeConfigService } from './services/storeConfigService'
@@ -131,8 +130,8 @@ function AdminLoginPage({ onLogin }) {
 
 function AppShell() {
   const showTemplateRoleSwitch = env.useMockData
-  const adminRoute = isAdminRoute()
   const inviteRoute = isInviteRoute()
+  const adminRoute = isAdminRoute()
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
   const [role, setRole] = useState(() => showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : authService.getSession()?.role || 'customer')
@@ -212,14 +211,14 @@ function AppShell() {
     if (!showTemplateRoleSwitch) return
     writeStorage(ROLE_STORAGE_KEY, nextRole)
     setRole(nextRole)
-    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing' || page === 'admin-invites')) setPage('order')
+    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
     if (nextRole === 'store' || nextRole === 'owner') setPage('order')
   }
 
   function refreshRole() {
     const nextRole = showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : authService.getSession()?.role || 'customer'
     setRole(nextRole)
-    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing' || page === 'admin-invites')) setPage('order')
+    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
   }
 
   function loginAdmin(session) {
@@ -245,15 +244,14 @@ function AppShell() {
         { value: 'orders', label: '訂單管理', icon: ClipboardList },
         { value: 'closing', label: '每日結帳', icon: Calculator },
         { value: 'products', label: '商品管理', icon: Package },
-        { value: 'settings', label: '設定', icon: Settings },
-        ...(role === 'owner' ? [{ value: 'admin-invites', label: '邀請管理', icon: UserPlus }] : [])
+        { value: 'settings', label: '設定', icon: Settings }
       ]
     }
     return [
       { value: 'order', label: '訂餐頁', icon: ShoppingBag },
       { value: 'orders', label: '我的訂單', icon: ClipboardList }
     ]
-  }, [isAdmin, role])
+  }, [isAdmin])
 
   const CurrentPage = shouldShowInviteAccept
     ? AdminInviteAcceptPage
@@ -267,9 +265,7 @@ function AppShell() {
             ? ProductManagementPage
             : page === 'settings' && isAdmin
               ? StoreSettingsPage
-              : page === 'admin-invites' && isAdmin && role === 'owner'
-                ? AdminInvitePage
-                : OrderPage
+              : OrderPage
 
   return (
     <div className="min-h-screen">
