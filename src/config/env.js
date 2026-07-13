@@ -1,8 +1,3 @@
-function boolEnv(value, defaultValue = false) {
-  if (value === undefined || value === null || value === '') return defaultValue
-  return value === 'true'
-}
-
 function hasFirebaseConfig(config) {
   return Boolean(
     config.apiKey &&
@@ -11,6 +6,8 @@ function hasFirebaseConfig(config) {
     config.appId
   )
 }
+
+const vercelEnv = import.meta.env.VITE_VERCEL_ENV || ''
 
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -30,7 +27,9 @@ export const env = {
   firebase: firebaseConfig,
   hasFirebaseConfig: hasFirebaseConfig(firebaseConfig),
   isLiffEnabled: Boolean(import.meta.env.VITE_LINE_LIFF_ID),
+  vercelEnv,
   isProd: import.meta.env.PROD,
   isDev: import.meta.env.DEV,
-  isPreview: boolEnv(import.meta.env.VITE_VERCEL_ENV === 'preview', false)
+  isPreview: vercelEnv === 'preview',
+  isProductionDeploy: vercelEnv === 'production'
 }
