@@ -74,7 +74,7 @@ function AdminLoginPage({ onLogin }) {
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cream text-brand"><UserRound size={24} /></div>
         <p className="mt-5 text-xs font-semibold text-accent">Management</p>
         <h1 className="mt-1 text-3xl font-black">管理入口</h1>
-        <p className="mt-3 text-sm leading-6 text-muted">老闆與門店使用帳號密碼登入。顧客請回到一般點餐頁。</p>
+        <p className="mt-3 text-sm leading-6 text-muted">第一次綁定或需要備援時，請使用帳號密碼進入。之後系統會依登入狀態自動顯示管理介面。</p>
         <div className="mt-5 space-y-3">
           <label className="block space-y-1"><span className="label">帳號</span><input className="input" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} autoComplete="username" required /></label>
           <label className="block space-y-1"><span className="label">密碼</span><input className="input" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="current-password" required /></label>
@@ -91,30 +91,26 @@ function AppShell() {
   const adminRoute = isAdminRoute()
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
-  const [role, setRole] = useState(() => showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : 'customer')
+  const [role, setRole] = useState(() => showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : authService.getSession()?.role || 'customer')
   const [adminSession, setAdminSession] = useState(() => authService.getSession())
   const [storeSettings, setStoreSettings] = useState({ brandName: env.storeName })
   const isLoggedAdmin = authService.isAdminSession(adminSession)
-  const isAdmin = showTemplateRoleSwitch ? role === 'store' || role === 'owner' : adminRoute && isLoggedAdmin && (role === 'store' || role === 'owner')
+  const isAdmin = showTemplateRoleSwitch ? role === 'store' || role === 'owner' : isLoggedAdmin && (role === 'store' || role === 'owner')
+  const shouldShowAdminLogin = adminRoute && !isAdmin && !showTemplateRoleSwitch
   const brandName = storeSettings?.brandName || env.storeName
 
   useEffect(() => {
-    if (!showTemplateRoleSwitch && adminRoute && isLoggedAdmin && role !== adminSession.role) {
+    if (!showTemplateRoleSwitch && isLoggedAdmin && role !== adminSession.role) {
       setRole(adminSession.role)
       writeStorage(ROLE_STORAGE_KEY, adminSession.role)
       setPage('order')
     }
-    if (!showTemplateRoleSwitch && !adminRoute && role !== 'customer') {
+    if (!showTemplateRoleSwitch && !isLoggedAdmin && role !== 'customer') {
       setRole('customer')
       writeStorage(ROLE_STORAGE_KEY, 'customer')
       setPage('order')
     }
-    if (!showTemplateRoleSwitch && adminRoute && !isLoggedAdmin && role !== 'customer') {
-      setRole('customer')
-      writeStorage(ROLE_STORAGE_KEY, 'customer')
-      setPage('order')
-    }
-  }, [showTemplateRoleSwitch, adminRoute, isLoggedAdmin, role, adminSession])
+  }, [showTemplateRoleSwitch, isLoggedAdmin, role, adminSession])
 
   useEffect(() => {
     let mounted = true
@@ -153,7 +149,7 @@ function AppShell() {
   }
 
   function refreshRole() {
-    const nextRole = showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : adminRoute ? authService.getSession()?.role || 'customer' : 'customer'
+    const nextRole = showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : authService.getSession()?.role || 'customer'
     setRole(nextRole)
     if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
   }
@@ -163,6 +159,7 @@ function AppShell() {
     setRole(session.role)
     writeStorage(ROLE_STORAGE_KEY, session.role)
     setPage('order')
+    if (window.location.pathname.startsWith('/admin')) window.history.replaceState({}, '', '/')
   }
 
   function logoutAdmin() {
@@ -189,7 +186,7 @@ function AppShell() {
     ]
   }, [isAdmin])
 
-  const CurrentPage = adminRoute && !isAdmin && !showTemplateRoleSwitch
+  const CurrentPage = shouldShowAdminLogin
     ? AdminLoginPage
     : page === 'orders'
       ? OrderManagementPage
@@ -217,7 +214,7 @@ function AppShell() {
                 <option value="owner">老闆</option>
               </select>
             )}
-            {!(adminRoute && !isAdmin && !showTemplateRoleSwitch) && (
+            {!shouldShowAdminLogin && (
               <nav className="flex gap-2">
                 {navItems.map((item) => {
                   const Icon = item.icon
@@ -227,7 +224,7 @@ function AppShell() {
                     </button>
                   )
                 })}
-                {!showTemplateRoleSwitch && adminRoute && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
+                {!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
               </nav>
             )}
           </div>
@@ -245,7 +242,7 @@ function AppShell() {
                 </select>
               </label>
             )}
-            {!(adminRoute && !isAdmin && !showTemplateRoleSwitch) && navItems.map((item) => {
+            {!shouldShowAdminLogin && navItems.map((item) => {
               const Icon = item.icon
               return (
                 <button key={item.value} onClick={() => { refreshRole(); setPage(item.value); setOpen(false) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
@@ -253,11 +250,11 @@ function AppShell() {
                 </button>
               )
             })}
-            {!showTemplateRoleSwitch && adminRoute && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
+            {!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
           </nav>
         )}
       </header>
-      <CurrentPage key={`${role}-${page}-${adminRoute ? 'admin' : 'public'}`} role={role} onRoleChange={refreshRole} onLogin={loginAdmin} adminSession={adminSession} />
+      <CurrentPage key={`${role}-${page}-${isAdmin ? 'admin' : 'public'}-${shouldShowAdminLogin ? 'login' : 'app'}`} role={role} onRoleChange={refreshRole} onLogin={loginAdmin} adminSession={adminSession} />
     </div>
   )
 }
