@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, ChevronDown, MapPin, MessageCircle, Search, ShoppingBag, UserRound } from 'lucide-react'
+import { CheckCircle2, ChevronDown, MapPin, MessageCircle, ShoppingBag, UserRound } from 'lucide-react'
 import ProductCard from '../components/ProductCard'
 import ProductOptionModal from '../components/ProductOptionModal'
 import CartPanel from '../components/CartPanel'
@@ -33,10 +33,6 @@ function getDistanceKm(a, b) {
   const lat2 = Number(b.latitude) * Math.PI / 180
   const x = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2)
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
-}
-
-function googleMapsSearchUrl(query) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query || '')}`
 }
 
 export default function OrderPage() {
@@ -207,7 +203,6 @@ export default function OrderPage() {
       customer: { name: isStore ? '門店櫃檯' : profile.name, phone: isStore ? '' : profile.phone, lineUserId: isStore ? '' : 'mock-line-user-id', lineDisplayName: isStore ? '' : profile.name },
       diningType,
       deliveryAddress: diningType === 'delivery' ? deliveryAddress.trim() : '',
-      deliveryMapUrl: diningType === 'delivery' ? googleMapsSearchUrl(deliveryAddress.trim()) : '',
       deliveryDistanceKm: diningType === 'delivery' && selectedStoreDistanceKm !== null ? Number(selectedStoreDistanceKm.toFixed(1)) : null,
       pickupTime: getScheduledTime(),
       items: cartItems,
@@ -262,12 +257,6 @@ export default function OrderPage() {
                 <span className="label">外送地址 *</span>
                 <textarea className="input min-h-24" value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="請填寫外送地址、樓層或備註" autoComplete="street-address" />
               </label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <a className={`btn-secondary text-center ${!deliveryAddress.trim() ? 'pointer-events-none opacity-40' : ''}`} href={deliveryAddress.trim() ? googleMapsSearchUrl(deliveryAddress.trim()) : '#'} target="_blank" rel="noreferrer">
-                  <Search size={16} className="inline-block" /> 用地圖搜尋地址
-                </a>
-                <button className="btn-secondary" type="button" onClick={() => navigator.geolocation?.getCurrentPosition((position) => setDeliveryAddress(`${position.coords.latitude}, ${position.coords.longitude}`), () => setMessage('無法取得目前定位。'))}>使用目前定位</button>
-              </div>
               <div className={`rounded-2xl p-3 text-xs leading-5 ${isOverDeliveryDistance ? 'bg-red-50 text-red-700' : 'bg-cream text-muted'}`}>
                 {maxDeliveryDistanceKm > 0 && <p>可外送距離：{maxDeliveryDistanceKm} km 內{selectedStoreDistanceKm !== null ? `｜目前約 ${selectedStoreDistanceKm.toFixed(1)} km` : ''}</p>}
                 {freeDeliveryMinAmount > 0 && <p>滿 {formatPrice(freeDeliveryMinAmount)} 免費外送｜目前 {cartTotal >= freeDeliveryMinAmount ? '已達門檻' : `還差 ${formatPrice(freeDeliveryMinAmount - cartTotal)}`}</p>}
