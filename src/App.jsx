@@ -1,10 +1,12 @@
 import { Component, useEffect, useMemo, useState } from 'react'
-import { Calculator, ClipboardList, LogOut, Menu, Package, Settings, ShoppingBag, UserRound } from 'lucide-react'
+import { Calculator, ClipboardList, LogOut, Menu, Package, Settings, ShoppingBag, UserPlus, UserRound } from 'lucide-react'
 import OrderPage from './pages/OrderPage'
 import OrderManagementPage from './pages/OrderManagementPage'
 import ProductManagementPage from './pages/ProductManagementPage'
 import StoreSettingsPage from './pages/StoreSettingsPage'
 import DailyClosingPage from './pages/DailyClosingPage'
+import AdminInvitePage from './pages/AdminInvitePage'
+import AdminInviteAcceptPage from './pages/AdminInviteAcceptPage'
 import { env } from './config/env'
 import { storeConfigService } from './services/storeConfigService'
 import { authService, ROLE_STORAGE_KEY } from './services/authService'
@@ -44,9 +46,17 @@ class AppErrorBoundary extends Component {
   }
 }
 
+function normalizedPathname() {
+  return window.location.pathname.replace(/\/+$/, '') || '/'
+}
+
 function isAdminRoute() {
-  const pathname = window.location.pathname.replace(/\/+$/, '') || '/'
+  const pathname = normalizedPathname()
   return pathname === '/admin' || pathname.startsWith('/admin/')
+}
+
+function isInviteRoute() {
+  return normalizedPathname() === '/admin/invite'
 }
 
 function AdminLoginPage({ onLogin }) {
@@ -89,6 +99,7 @@ function AdminLoginPage({ onLogin }) {
 function AppShell() {
   const showTemplateRoleSwitch = env.useMockData
   const adminRoute = isAdminRoute()
+  const inviteRoute = isInviteRoute()
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
   const [role, setRole] = useState(() => showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : authService.getSession()?.role || 'customer')
@@ -97,7 +108,8 @@ function AppShell() {
   const [lineChecking, setLineChecking] = useState(false)
   const isLoggedAdmin = authService.isAdminSession(adminSession)
   const isAdmin = showTemplateRoleSwitch ? role === 'store' || role === 'owner' : isLoggedAdmin && (role === 'store' || role === 'owner')
-  const shouldShowAdminLogin = adminRoute && !isAdmin && !showTemplateRoleSwitch
+  const shouldShowInviteAccept = inviteRoute && !showTemplateRoleSwitch
+  const shouldShowAdminLogin = adminRoute && !inviteRoute && !isAdmin && !showTemplateRoleSwitch
   const brandName = storeSettings?.brandName || env.storeName
 
   useEffect(() => {
@@ -114,7 +126,7 @@ function AppShell() {
   }, [showTemplateRoleSwitch, isLoggedAdmin, role, adminSession])
 
   useEffect(() => {
-    if (showTemplateRoleSwitch || isLoggedAdmin || !env.isLiffEnabled) return
+    if (showTemplateRoleSwitch || isLoggedAdmin || !env.isLiffEnabled || inviteRoute) return
     let mounted = true
     async function loginByLine() {
       setLineChecking(true)
@@ -133,7 +145,7 @@ function AppShell() {
     }
     loginByLine()
     return () => { mounted = false }
-  }, [showTemplateRoleSwitch, isLoggedAdmin])
+  }, [showTemplateRoleSwitch, isLoggedAdmin, inviteRoute])
 
   useEffect(() => {
     let mounted = true
@@ -167,14 +179,14 @@ function AppShell() {
     if (!showTemplateRoleSwitch) return
     writeStorage(ROLE_STORAGE_KEY, nextRole)
     setRole(nextRole)
-    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
+    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing' || page === 'admin-invites')) setPage('order')
     if (nextRole === 'store' || nextRole === 'owner') setPage('order')
   }
 
   function refreshRole() {
     const nextRole = showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : authService.getSession()?.role || 'customer'
     setRole(nextRole)
-    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
+    if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing' || page === 'admin-invites')) setPage('order')
   }
 
   function loginAdmin(session) {
@@ -200,26 +212,31 @@ function AppShell() {
         { value: 'orders', label: '訂單管理', icon: ClipboardList },
         { value: 'closing', label: '每日結帳', icon: Calculator },
         { value: 'products', label: '商品管理', icon: Package },
-        { value: 'settings', label: '設定', icon: Settings }
+        { value: 'settings', label: '設定', icon: Settings },
+        ...(role === 'owner' ? [{ value: 'admin-invites', label: '邀請管理', icon: UserPlus }] : [])
       ]
     }
     return [
       { value: 'order', label: '訂餐頁', icon: ShoppingBag },
       { value: 'orders', label: '我的訂單', icon: ClipboardList }
     ]
-  }, [isAdmin])
+  }, [isAdmin, role])
 
-  const CurrentPage = shouldShowAdminLogin
-    ? AdminLoginPage
-    : page === 'orders'
-      ? OrderManagementPage
-      : page === 'closing' && isAdmin
-        ? DailyClosingPage
-        : page === 'products' && isAdmin
-          ? ProductManagementPage
-          : page === 'settings' && isAdmin
-            ? StoreSettingsPage
-            : OrderPage
+  const CurrentPage = shouldShowInviteAccept
+    ? AdminInviteAcceptPage
+    : shouldShowAdminLogin
+      ? AdminLoginPage
+      : page === 'orders'
+        ? OrderManagementPage
+        : page === 'closing' && isAdmin
+          ? DailyClosingPage
+          : page === 'products' && isAdmin
+            ? ProductManagementPage
+            : page === 'settings' && isAdmin
+              ? StoreSettingsPage
+              : page === 'admin-invites' && isAdmin && role === 'owner'
+                ? AdminInvitePage
+                : OrderPage
 
   return (
     <div className="min-h-screen">
@@ -238,7 +255,7 @@ function AppShell() {
                 <option value="owner">老闆</option>
               </select>
             )}
-            {!shouldShowAdminLogin && (
+            {!shouldShowAdminLogin && !shouldShowInviteAccept && (
               <nav className="flex gap-2">
                 {navItems.map((item) => {
                   const Icon = item.icon
@@ -266,7 +283,7 @@ function AppShell() {
                 </select>
               </label>
             )}
-            {!shouldShowAdminLogin && navItems.map((item) => {
+            {!shouldShowAdminLogin && !shouldShowInviteAccept && navItems.map((item) => {
               const Icon = item.icon
               return (
                 <button key={item.value} onClick={() => { refreshRole(); setPage(item.value); setOpen(false) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
@@ -278,7 +295,7 @@ function AppShell() {
           </nav>
         )}
       </header>
-      <CurrentPage key={`${role}-${page}-${isAdmin ? 'admin' : 'public'}-${shouldShowAdminLogin ? 'login' : 'app'}`} role={role} onRoleChange={refreshRole} onLogin={loginAdmin} adminSession={adminSession} />
+      <CurrentPage key={`${role}-${page}-${isAdmin ? 'admin' : 'public'}-${shouldShowAdminLogin ? 'login' : shouldShowInviteAccept ? 'invite' : 'app'}`} role={role} onRoleChange={refreshRole} onLogin={loginAdmin} adminSession={adminSession} />
     </div>
   )
 }
