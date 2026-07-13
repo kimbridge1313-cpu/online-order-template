@@ -350,23 +350,21 @@ export default function OrderPage() {
 
   if (!isStore && checkoutStep === 'checkout') {
     return (
-      <div className="mx-auto grid max-w-5xl gap-6 px-4 py-6 lg:grid-cols-[1fr_360px]">
-        <main className="space-y-5">
-          <section className="card p-5">
-            <p className="text-xs font-semibold text-accent">Checkout</p>
-            <h1 className="mt-1 text-3xl font-black">確認訂單</h1>
-            <p className="mt-2 text-sm text-muted">確認門店、用餐方式、時間與訂單聯絡資料。</p>
-          </section>
-          {renderOrderOptionsPanel()}
-          <section className="card p-5">
-            <h2 className="font-black">訂單聯絡資料</h2>
-            <div className="mt-3 rounded-2xl bg-cream p-4 text-sm"><p className="font-bold">{profile.name}</p><p className="mt-1 text-muted">{profile.phone}</p></div>
-            <label className="mt-4 block space-y-1"><span className="label">訂單備註</span><textarea className="input min-h-24" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} /></label>
-          </section>
-          {message && <p className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
-          <button className="btn-secondary" type="button" onClick={() => setCheckoutStep('ordering')}>返回修改商品</button>
-        </main>
-        <div className="space-y-4"><CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={submitOrder} submitLabel="送出訂單" /></div>
+      <div className="mx-auto max-w-2xl space-y-5 px-4 py-6">
+        <section className="card p-5">
+          <p className="text-xs font-semibold text-accent">Checkout</p>
+          <h1 className="mt-1 text-3xl font-black">確認訂單</h1>
+          <p className="mt-2 text-sm text-muted">確認購物車、門店、用餐方式、時間與訂單聯絡資料。</p>
+        </section>
+        <CartPanel items={cartItems} onRemove={removeFromCart} onSubmit={submitOrder} submitLabel="送出訂單" />
+        {renderOrderOptionsPanel()}
+        <section className="card p-5">
+          <h2 className="font-black">訂單聯絡資料</h2>
+          <div className="mt-3 rounded-2xl bg-cream p-4 text-sm"><p className="font-bold">{profile.name}</p><p className="mt-1 text-muted">{profile.phone}</p></div>
+          <label className="mt-4 block space-y-1"><span className="label">訂單備註</span><textarea className="input min-h-24" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} /></label>
+        </section>
+        {message && <p className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
+        <button className="btn-secondary w-full" type="button" onClick={() => setCheckoutStep('ordering')}>返回修改商品</button>
       </div>
     )
   }
