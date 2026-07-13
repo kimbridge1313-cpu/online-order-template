@@ -3,7 +3,7 @@ import { CheckCircle2, ChevronDown, ChevronUp, MapPin, MessageCircle, Minus, Plu
 import ProductCard from '../components/ProductCard'
 import ProductOptionModal from '../components/ProductOptionModal'
 import CartPanel from '../components/CartPanel'
-import DiningTypeSelector from '../components/DiningTypeSelector'
+import DiningTypeSelector, { allDiningTypes } from '../components/DiningTypeSelector'
 import { productService } from '../services/productService'
 import { orderService } from '../services/orderService'
 import { calculateCartTotal, formatPrice } from '../utils/price'
@@ -15,12 +15,25 @@ const MOCK_ROLE_KEY = 'online-order-template-role'
 const MOCK_LINE_LOGIN_KEY = 'online-order-template-line-login'
 const STORE_SETTINGS_KEY = 'online-order-template-store-settings'
 const STORE_LIST_KEY = 'online-order-template-store-list'
+const defaultDiningModules = { dine_in: true, takeaway: true, delivery: false }
+const defaultStoreSettings = { tableNumberEnabled: false, tableNumbers: [], diningModules: defaultDiningModules }
 const defaultStores = [
   { id: 'demo-store', name: '示範門店', accountName: 'demo-store-account', latitude: 23.6978, longitude: 120.9605, address: '示範地址', isActive: true }
 ]
 
 function getTodayDate() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function normalizeStoreSettings(rawSettings = {}) {
+  return {
+    ...defaultStoreSettings,
+    ...rawSettings,
+    diningModules: {
+      ...defaultDiningModules,
+      ...(rawSettings.diningModules || {})
+    }
+  }
 }
 
 function getDistanceKm(a, b) {
@@ -69,7 +82,7 @@ export default function OrderPage() {
   const [isLineLoggedIn, setIsLineLoggedIn] = useState(() => readStorage(MOCK_LINE_LOGIN_KEY, false))
   const [profile, setProfile] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
   const [profileDraft, setProfileDraft] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
-  const [storeSettings] = useState(() => readStorage(STORE_SETTINGS_KEY, { tableNumberEnabled: false, tableNumbers: [] }))
+  const [storeSettings] = useState(() => normalizeStoreSettings(readStorage(STORE_SETTINGS_KEY, defaultStoreSettings)))
   const [stores] = useState(() => readStorage(STORE_LIST_KEY, defaultStores).filter((store) => store.isActive !== false))
   const [selectedStoreId, setSelectedStoreId] = useState(() => (readStorage(STORE_LIST_KEY, defaultStores).find((store) => store.isActive !== false)?.id || 'demo-store'))
   const [storeLocationMessage, setStoreLocationMessage] = useState('')
@@ -80,6 +93,7 @@ export default function OrderPage() {
   const [mobileCartOpen, setMobileCartOpen] = useState(false)
   const [checkoutStep, setCheckoutStep] = useState('ordering')
   const [diningType, setDiningType] = useState('dine_in')
+  const [deliveryAddress, setDeliveryAddress] = useState('')
   const [bagging, setBagging] = useState(false)
   const [timeType, setTimeType] = useState('now')
   const [orderDate, setOrderDate] = useState(getTodayDate())
@@ -94,6 +108,9 @@ export default function OrderPage() {
   const source = isStore ? 'counter' : 'customer_online'
   const cartTotal = calculateCartTotal(cartItems)
   const selectedStore = stores.find((store) => store.id === selectedStoreId) || stores[0]
+  const diningModules = { ...defaultDiningModules, ...(storeSettings.diningModules || {}) }
+  const diningOptions = allDiningTypes.filter((item) => diningModules[item.value])
+  const activeDiningOptions = diningOptions.length > 0 ? diningOptions : allDiningTypes.slice(0, 1)
 
   async function loadProducts() {
     const data = await productService.listProducts()
@@ -101,6 +118,17 @@ export default function OrderPage() {
   }
 
   useEffect(() => { loadProducts() }, [])
+
+  useEffect(() => {
+    if (!activeDiningOptions.some((item) => item.value === diningType)) {
+      setDiningType(activeDiningOptions[0]?.value || 'dine_in')
+    }
+  }, [activeDiningOptions, diningType])
+
+  useEffect(() => {
+    if (diningType !== 'delivery') setDeliveryAddress('')
+    if (diningType !== 'dine_in') setTableNumber('')
+  }, [diningType])
 
   useEffect(() => {
     if (isStore || stores.length === 0) return
@@ -183,6 +211,7 @@ export default function OrderPage() {
     if (cartItems.length === 0) return setMessage('請先加入商品。')
     if (!hasProfile) return setMessage('請先完成顧客資料。')
     if (!selectedStore) return setMessage('請選擇門店。')
+    if (diningType === 'delivery' && !deliveryAddress.trim()) return setMessage('請填寫外送地址。')
     if (timeType === 'scheduled' && !getScheduledTime()) return setMessage('請選擇預定日期與時間。')
 
     const order = await orderService.createOrder({
@@ -195,13 +224,15 @@ export default function OrderPage() {
         lineDisplayName: isStore ? '' : profile.name
       },
       diningType,
+      deliveryAddress: diningType === 'delivery' ? deliveryAddress.trim() : '',
       pickupTime: getScheduledTime(),
       items: cartItems,
       totalAmount: calculateCartTotal(cartItems),
       note: [
         selectedStore ? `門店：${selectedStore.name}` : '',
         timeType === 'now' ? '時間：立即' : `時間：${orderDate} ${orderTime}`,
-        storeSettings.tableNumberEnabled && tableNumber ? `桌號：${tableNumber}` : '',
+        storeSettings.tableNumberEnabled && diningType === 'dine_in' && tableNumber ? `桌號：${tableNumber}` : '',
+        diningType === 'delivery' && deliveryAddress.trim() ? `外送地址：${deliveryAddress.trim()}` : '',
         bagging ? '需要打包' : '不需打包',
         note ? `備註：${note}` : ''
       ].filter(Boolean).join('｜')
@@ -210,6 +241,7 @@ export default function OrderPage() {
     setCartItems([])
     setNote('')
     setTableNumber('')
+    setDeliveryAddress('')
     setBagging(false)
     setTimeType('now')
     setOrderDate(getTodayDate())
@@ -262,14 +294,20 @@ export default function OrderPage() {
         {!isStore && <StoreSelector />}
         <section className={isStore ? 'card p-3' : 'card p-4'}>
           <h2 className="font-black">用餐方式</h2>
-          <div className="mt-2"><DiningTypeSelector value={diningType} onChange={setDiningType} /></div>
-          {storeSettings.tableNumberEnabled && (
+          <div className="mt-2"><DiningTypeSelector value={diningType} onChange={setDiningType} options={activeDiningOptions} /></div>
+          {storeSettings.tableNumberEnabled && diningType === 'dine_in' && (
             <label className="mt-3 block space-y-1">
               <span className="label">桌號</span>
               <select className="input" value={tableNumber} onChange={(event) => setTableNumber(event.target.value)}>
                 <option value="">請選擇桌號</option>
                 {(storeSettings.tableNumbers || []).map((table) => <option key={table.id} value={table.name}>{table.name}</option>)}
               </select>
+            </label>
+          )}
+          {diningType === 'delivery' && (
+            <label className="mt-3 block space-y-1">
+              <span className="label">外送地址 *</span>
+              <textarea className="input min-h-20" value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="請填寫外送地址、樓層或備註" />
             </label>
           )}
           <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
@@ -279,7 +317,7 @@ export default function OrderPage() {
         </section>
 
         <section className={isStore ? 'card p-3' : 'card p-4'}>
-          <h2 className="font-black">用餐 / 取餐時間</h2>
+          <h2 className="font-black">用餐 / 取餐 / 外送時間</h2>
           <div className="mt-2 grid grid-cols-2 gap-2 rounded-3xl bg-cream p-1.5">
             <button className={`rounded-2xl px-3 py-2.5 text-sm font-bold ${timeType === 'now' ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setTimeType('now')}>立即</button>
             <button className={`rounded-2xl px-3 py-2.5 text-sm font-bold ${timeType === 'scheduled' ? 'bg-white text-brand shadow' : 'text-muted'}`} type="button" onClick={() => setTimeType('scheduled')}>預定</button>
@@ -339,7 +377,7 @@ export default function OrderPage() {
     return (
       <div className="mx-auto grid max-w-5xl gap-6 px-4 py-6 lg:grid-cols-[1fr_360px]">
         <main className="space-y-5">
-          <section className="card p-5"><p className="text-xs font-semibold text-accent">Checkout</p><h1 className="mt-1 text-3xl font-black">確認訂單</h1><p className="mt-2 text-sm text-muted">確認門店、用餐方式、用餐 / 取餐時間與訂單聯絡資料。</p></section>
+          <section className="card p-5"><p className="text-xs font-semibold text-accent">Checkout</p><h1 className="mt-1 text-3xl font-black">確認訂單</h1><p className="mt-2 text-sm text-muted">確認門店、用餐方式、用餐 / 取餐 / 外送時間與訂單聯絡資料。</p></section>
           <OrderOptionsPanel />
           <section className="card p-5"><h2 className="font-black">訂單聯絡資料</h2><div className="mt-3 rounded-2xl bg-cream p-4 text-sm"><p className="font-bold">{profile.name}</p><p className="mt-1 text-muted">{profile.phone}</p><p className="mt-2 text-xs text-muted">資料僅限訂單聯絡使用。</p></div><label className="mt-4 block space-y-1"><span className="label">訂單備註</span><textarea className="input min-h-24" placeholder="例如：餐具需求、特殊備註" value={note} onChange={(event) => setNote(event.target.value)} /></label></section>
           {message && <p className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
