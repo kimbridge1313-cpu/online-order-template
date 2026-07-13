@@ -2,11 +2,32 @@ import { useState } from 'react'
 import { ChevronDown, ChevronUp, Minus, Plus, Trash2 } from 'lucide-react'
 import { calculateCartTotal, formatPrice } from '../utils/price'
 
+function recalcItem(item, quantity) {
+  const nextQuantity = Math.max(1, Number(quantity || 1))
+  const unitPrice = Number(item.unitPrice ?? item.basePrice ?? 0)
+  return {
+    ...item,
+    quantity: nextQuantity,
+    subtotal: unitPrice * nextQuantity
+  }
+}
+
 export default function CartPanel({ items, onRemove, onSubmit, onQuantityChange, disabled, submitLabel = '送出訂單', title = '購物車', compact = false, defaultCollapsed = false }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed || compact)
+  const [, forceRender] = useState(0)
   const total = calculateCartTotal(items)
   const itemCount = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
   const isCollapsed = compact && collapsed
+
+  function editQuantity(index, quantity) {
+    if (onQuantityChange) {
+      onQuantityChange(index, quantity)
+      return
+    }
+    const nextItem = recalcItem(items[index], quantity)
+    Object.assign(items[index], nextItem)
+    forceRender((value) => value + 1)
+  }
 
   return (
     <aside className={`card safe-bottom ${compact ? 'p-3' : 'p-4 sticky bottom-4 lg:top-6 lg:bottom-auto'}`}>
@@ -34,13 +55,11 @@ export default function CartPanel({ items, onRemove, onSubmit, onQuantityChange,
 
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-muted">數量</span>
-                  {onQuantityChange ? (
-                    <div className="flex items-center gap-2">
-                      <button className="flex h-8 w-8 items-center justify-center rounded-xl border border-line" type="button" onClick={() => onQuantityChange(index, Number(item.quantity || 1) - 1)}><Minus size={14} /></button>
-                      <span className="w-7 text-center text-sm font-bold">{item.quantity}</span>
-                      <button className="flex h-8 w-8 items-center justify-center rounded-xl border border-line" type="button" onClick={() => onQuantityChange(index, Number(item.quantity || 1) + 1)}><Plus size={14} /></button>
-                    </div>
-                  ) : <span className="text-sm font-bold">{item.quantity}</span>}
+                  <div className="flex items-center gap-2">
+                    <button className="flex h-8 w-8 items-center justify-center rounded-xl border border-line" type="button" onClick={() => editQuantity(index, Number(item.quantity || 1) - 1)}><Minus size={14} /></button>
+                    <span className="w-7 text-center text-sm font-bold">{item.quantity}</span>
+                    <button className="flex h-8 w-8 items-center justify-center rounded-xl border border-line" type="button" onClick={() => editQuantity(index, Number(item.quantity || 1) + 1)}><Plus size={14} /></button>
+                  </div>
                 </div>
 
                 {item.selectedOptions?.length > 0 && (
