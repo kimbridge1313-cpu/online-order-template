@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useState } from 'react'
-import { Calculator, ClipboardList, Menu, Package, Settings, ShoppingBag } from 'lucide-react'
+import { Calculator, ClipboardList, LogOut, Menu, Package, Settings, ShoppingBag, UserRound } from 'lucide-react'
 import OrderPage from './pages/OrderPage'
 import OrderManagementPage from './pages/OrderManagementPage'
 import ProductManagementPage from './pages/ProductManagementPage'
@@ -7,9 +7,8 @@ import StoreSettingsPage from './pages/StoreSettingsPage'
 import DailyClosingPage from './pages/DailyClosingPage'
 import { env } from './config/env'
 import { storeConfigService } from './services/storeConfigService'
+import { authService, ROLE_STORAGE_KEY } from './services/authService'
 import { readStorage, writeStorage } from './utils/storage'
-
-const ROLE_STORAGE_KEY = 'online-order-template-role'
 
 class AppErrorBoundary extends Component {
   constructor(props) {
@@ -45,36 +44,66 @@ class AppErrorBoundary extends Component {
   }
 }
 
-function RoleSwitcher({ role, onChange, compact = false }) {
-  if (!env.useMockData) return null
-  if (compact) {
-    return (
-      <label className="space-y-1">
-        <span className="text-xs font-bold text-muted">模板身份</span>
-        <select className="input" value={role} onChange={(event) => onChange(event.target.value)}>
-          <option value="customer">顧客</option>
-          <option value="store">門店</option>
-          <option value="owner">老闆</option>
-        </select>
-      </label>
-    )
+function AdminLoginPage({ onLogin }) {
+  const [form, setForm] = useState({ username: '', password: '' })
+  const [message, setMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  async function submit(event) {
+    event.preventDefault()
+    setMessage('')
+    setSubmitting(true)
+    try {
+      const session = await authService.login(form)
+      onLogin(session)
+    } catch (error) {
+      setMessage(error.message || '登入失敗。')
+    } finally {
+      setSubmitting(false)
+    }
   }
+
   return (
-    <select className="rounded-2xl border border-line bg-white px-3 py-3 text-sm font-bold text-ink" value={role} onChange={(event) => onChange(event.target.value)} aria-label="模板身份切換">
-      <option value="customer">顧客</option>
-      <option value="store">門店</option>
-      <option value="owner">老闆</option>
-    </select>
+    <div className="mx-auto max-w-xl px-4 py-10">
+      <form className="card p-7" onSubmit={submit}>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cream text-brand"><UserRound size={24} /></div>
+        <p className="mt-5 text-xs font-semibold text-accent">Admin Login</p>
+        <h1 className="mt-1 text-3xl font-black">後台登入</h1>
+        <p className="mt-3 text-sm leading-6 text-muted">老闆與門店使用帳號密碼登入。顧客訂餐不需要登入後台。</p>
+        <div className="mt-5 space-y-3">
+          <label className="block space-y-1"><span className="label">帳號</span><input className="input" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} autoComplete="username" required /></label>
+          <label className="block space-y-1"><span className="label">密碼</span><input className="input" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="current-password" required /></label>
+        </div>
+        {message && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
+        <button className="btn-primary mt-5 w-full" type="submit" disabled={submitting}>{submitting ? '登入中...' : '登入後台'}</button>
+      </form>
+    </div>
   )
 }
 
 function AppShell() {
+  const showTemplateRoleSwitch = env.useMockData
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
-  const [role, setRole] = useState(() => readStorage(ROLE_STORAGE_KEY, 'customer'))
+  const [role, setRole] = useState(() => showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : 'customer')
+  const [adminSession, setAdminSession] = useState(() => authService.getSession())
   const [storeSettings, setStoreSettings] = useState({ brandName: env.storeName })
   const isAdmin = role === 'store' || role === 'owner'
+  const isLoggedAdmin = authService.isAdminSession(adminSession)
   const brandName = storeSettings?.brandName || env.storeName
+
+  useEffect(() => {
+    if (!showTemplateRoleSwitch && isLoggedAdmin && role !== adminSession.role) {
+      setRole(adminSession.role)
+      writeStorage(ROLE_STORAGE_KEY, adminSession.role)
+      setPage('order')
+    }
+    if (!showTemplateRoleSwitch && !isLoggedAdmin && role !== 'customer') {
+      setRole('customer')
+      writeStorage(ROLE_STORAGE_KEY, 'customer')
+      setPage('order')
+    }
+  }, [showTemplateRoleSwitch, isLoggedAdmin, adminSession, role])
 
   useEffect(() => {
     let mounted = true
@@ -93,16 +122,19 @@ function AppShell() {
   }, [])
 
   useEffect(() => {
-    if (env.useMockData) return
-    if (role !== 'customer') {
-      writeStorage(ROLE_STORAGE_KEY, 'customer')
-      setRole('customer')
-      if (page === 'products' || page === 'settings' || page === 'closing') setPage('order')
+    function refreshSession() {
+      setAdminSession(authService.getSession())
     }
-  }, [role, page])
+    window.addEventListener('admin-session-updated', refreshSession)
+    window.addEventListener('storage', refreshSession)
+    return () => {
+      window.removeEventListener('admin-session-updated', refreshSession)
+      window.removeEventListener('storage', refreshSession)
+    }
+  }, [])
 
   function switchRole(nextRole) {
-    if (!env.useMockData) return
+    if (!showTemplateRoleSwitch) return
     writeStorage(ROLE_STORAGE_KEY, nextRole)
     setRole(nextRole)
     if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
@@ -110,10 +142,24 @@ function AppShell() {
   }
 
   function refreshRole() {
-    if (!env.useMockData) return
-    const nextRole = readStorage(ROLE_STORAGE_KEY, 'customer')
+    const nextRole = showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : authService.getSession()?.role || 'customer'
     setRole(nextRole)
     if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
+  }
+
+  function handleAdminLogin(session) {
+    setAdminSession(session)
+    setRole(session.role)
+    setPage('order')
+    setOpen(false)
+  }
+
+  function logoutAdmin() {
+    authService.logout()
+    setAdminSession(null)
+    setRole('customer')
+    setPage('order')
+    setOpen(false)
   }
 
   const navItems = useMemo(() => {
@@ -132,15 +178,17 @@ function AppShell() {
     ]
   }, [isAdmin])
 
-  const CurrentPage = page === 'orders'
-    ? OrderManagementPage
-    : page === 'closing' && isAdmin
-      ? DailyClosingPage
-      : page === 'products' && isAdmin
-        ? ProductManagementPage
-        : page === 'settings' && isAdmin
-          ? StoreSettingsPage
-          : OrderPage
+  const CurrentPage = page === 'admin-login' && !showTemplateRoleSwitch && !isLoggedAdmin
+    ? AdminLoginPage
+    : page === 'orders'
+      ? OrderManagementPage
+      : page === 'closing' && isAdmin
+        ? DailyClosingPage
+        : page === 'products' && isAdmin
+          ? ProductManagementPage
+          : page === 'settings' && isAdmin
+            ? StoreSettingsPage
+            : OrderPage
 
   return (
     <div className="min-h-screen">
@@ -151,7 +199,13 @@ function AppShell() {
             <h1 className="truncate text-lg font-black text-ink">{env.appName}</h1>
           </div>
           <div className="hidden items-center gap-2 md:flex">
-            <RoleSwitcher role={role} onChange={switchRole} />
+            {showTemplateRoleSwitch && (
+              <select className="rounded-2xl border border-line bg-white px-3 py-3 text-sm font-bold text-ink" value={role} onChange={(event) => switchRole(event.target.value)} aria-label="模板身份切換">
+                <option value="customer">顧客</option>
+                <option value="store">門店</option>
+                <option value="owner">老闆</option>
+              </select>
+            )}
             <nav className="flex gap-2">
               {navItems.map((item) => {
                 const Icon = item.icon
@@ -161,13 +215,24 @@ function AppShell() {
                   </button>
                 )
               })}
+              {!showTemplateRoleSwitch && !isLoggedAdmin && <button className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === 'admin-login' ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button" onClick={() => setPage('admin-login')}><UserRound size={18} /> 後台登入</button>}
+              {!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
             </nav>
           </div>
           <button className="rounded-2xl bg-white p-3 md:hidden" onClick={() => setOpen(!open)} type="button"><Menu size={20} /></button>
         </div>
         {open && (
           <nav className="grid gap-2 border-t border-line px-4 py-3 md:hidden">
-            <RoleSwitcher role={role} onChange={switchRole} compact />
+            {showTemplateRoleSwitch && (
+              <label className="space-y-1">
+                <span className="text-xs font-bold text-muted">模板身份</span>
+                <select className="input" value={role} onChange={(event) => switchRole(event.target.value)}>
+                  <option value="customer">顧客</option>
+                  <option value="store">門店</option>
+                  <option value="owner">老闆</option>
+                </select>
+              </label>
+            )}
             {navItems.map((item) => {
               const Icon = item.icon
               return (
@@ -176,10 +241,12 @@ function AppShell() {
                 </button>
               )
             })}
+            {!showTemplateRoleSwitch && !isLoggedAdmin && <button className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === 'admin-login' ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button" onClick={() => { setPage('admin-login'); setOpen(false) }}><UserRound size={18} /> 後台登入</button>}
+            {!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
           </nav>
         )}
       </header>
-      <CurrentPage key={`${role}-${page}`} role={role} onRoleChange={refreshRole} />
+      <CurrentPage key={`${role}-${page}`} role={role} onRoleChange={refreshRole} onLogin={handleAdminLogin} adminSession={adminSession} />
     </div>
   )
 }
