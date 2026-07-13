@@ -40,6 +40,11 @@ function blobToDataUrl(blob) {
   })
 }
 
+function makeSafeFileName(name = 'product') {
+  const baseName = name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-_]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'product'
+  return `${baseName}.webp`
+}
+
 export async function compressProductImage(file) {
   if (!file) return null
   if (!file.type.startsWith('image/')) throw new Error('請選擇圖片檔。')
@@ -66,8 +71,11 @@ export async function compressProductImage(file) {
 
   if (blob.size > MAX_UPLOAD_SIZE_BYTES) throw new Error('壓縮後圖片仍超過 1MB，請改用更小的圖片。')
 
+  const imageFile = new File([blob], makeSafeFileName(file.name), { type: MIME_TYPE })
+
   return {
     imageUrl: await blobToDataUrl(blob),
+    imageFile,
     imageMeta: {
       originalName: file.name,
       originalSize: file.size,
