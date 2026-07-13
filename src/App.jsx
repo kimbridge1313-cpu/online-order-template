@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useState } from 'react'
-import { Calculator, ClipboardList, LogOut, Menu, Package, Settings, ShoppingBag, UserPlus, UserRound } from 'lucide-react'
+import { Calculator, ClipboardList, LogOut, Menu, Package, QrCode, Settings, ShoppingBag, UserPlus, UserRound } from 'lucide-react'
 import OrderPage from './pages/OrderPage'
 import OrderManagementPage from './pages/OrderManagementPage'
 import ProductManagementPage from './pages/ProductManagementPage'
@@ -63,6 +63,7 @@ function AdminLoginPage({ onLogin }) {
   const [form, setForm] = useState({ username: '', password: '' })
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [lineSubmitting, setLineSubmitting] = useState(false)
 
   async function submit(event) {
     event.preventDefault()
@@ -78,20 +79,52 @@ function AdminLoginPage({ onLogin }) {
     }
   }
 
+  async function loginWithLine() {
+    setMessage('')
+    setLineSubmitting(true)
+    try {
+      const session = await authService.loginWithLineProfile({ requireLogin: true })
+      if (session) {
+        onLogin(session)
+        return
+      }
+      setMessage('尚未找到已綁定此 LINE 的管理帳號。請先用帳號密碼登入，或請老闆重新發送邀請。')
+    } catch (error) {
+      setMessage(error.message || 'LINE 登入失敗。')
+    } finally {
+      setLineSubmitting(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-xl px-4 py-10">
-      <form className="card p-7" onSubmit={submit}>
+      <section className="card p-7">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cream text-brand"><UserRound size={24} /></div>
         <p className="mt-5 text-xs font-semibold text-accent">Management</p>
         <h1 className="mt-1 text-3xl font-black">管理入口</h1>
-        <p className="mt-3 text-sm leading-6 text-muted">第一次綁定或需要備援時，請使用帳號密碼進入。之後系統會依 LINE 身份自動顯示管理介面。</p>
-        <div className="mt-5 space-y-3">
-          <label className="block space-y-1"><span className="label">帳號</span><input className="input" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} autoComplete="username" required /></label>
-          <label className="block space-y-1"><span className="label">密碼</span><input className="input" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="current-password" required /></label>
+        <p className="mt-3 text-sm leading-6 text-muted">門店可使用帳號密碼登入；已綁定 LINE 的管理員，也可以使用 LINE 授權或桌機掃碼登入。</p>
+
+        {env.isLiffEnabled && (
+          <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-black text-ink" type="button" onClick={loginWithLine} disabled={lineSubmitting}>
+            <QrCode size={18} /> {lineSubmitting ? '正在開啟 LINE...' : '使用 LINE / 掃碼登入'}
+          </button>
+        )}
+
+        <div className="my-5 flex items-center gap-3 text-xs font-bold text-muted">
+          <span className="h-px flex-1 bg-line" />
+          <span>或使用帳號密碼</span>
+          <span className="h-px flex-1 bg-line" />
         </div>
-        {message && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
-        <button className="btn-primary mt-5 w-full" type="submit" disabled={submitting}>{submitting ? '登入中...' : '進入管理系統'}</button>
-      </form>
+
+        <form onSubmit={submit}>
+          <div className="space-y-3">
+            <label className="block space-y-1"><span className="label">帳號</span><input className="input" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} autoComplete="username" required /></label>
+            <label className="block space-y-1"><span className="label">密碼</span><input className="input" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="current-password" required /></label>
+          </div>
+          {message && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
+          <button className="btn-primary mt-5 w-full" type="submit" disabled={submitting}>{submitting ? '登入中...' : '帳號密碼登入'}</button>
+        </form>
+      </section>
     </div>
   )
 }
