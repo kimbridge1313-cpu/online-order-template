@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore'
 import { env } from '../config/env'
 import { assertFirestoreReady } from '../config/firebase'
 import { readStorage, writeStorage } from '../utils/storage'
@@ -24,8 +24,24 @@ function normalizeAdminUser(id, data = {}) {
     displayName: data.displayName || data.username || id,
     isActive: data.isActive !== false,
     password: data.password || '',
-    passwordHash: data.passwordHash || ''
+    passwordHash: data.passwordHash || '',
+    createdAt: data.createdAt || '',
+    updatedAt: data.updatedAt || '',
+    lastLoginAt: data.lastLoginAt || ''
   }
+}
+
+function cleanAdminPayload(user = {}) {
+  return JSON.parse(JSON.stringify({
+    username: user.username,
+    role: user.role === 'owner' ? 'owner' : 'store',
+    storeId: user.role === 'owner' ? '' : user.storeId || '',
+    storeName: user.role === 'owner' ? '' : user.storeName || '',
+    displayName: user.displayName || user.username,
+    isActive: user.isActive !== false,
+    ...(user.password ? { password: user.password } : {}),
+    updatedAt: new Date().toISOString()
+  }))
 }
 
 function saveSession(user) {
@@ -67,27 +83,33 @@ async function loginWithFirebase({ username, password }) {
   return saveSession(user)
 }
 
-async function bootstrapOwnerWithFirebase({ username, password }) {
+async function listAdminUsersWithFirebase() {
   const db = assertFirestoreReady()
-  const cleanUsername = String(username || '').trim()
-  if (!cleanUsername || !password) throw new Error('請先在 Vercel 設定初始化帳號與密碼。')
+  const snapshot = await getDocs(query(collection(db, ADMIN_USERS_COLLECTION), orderBy('username', 'asc')))
+  return snapshot.docs.map((item) => sanitizeUser(normalizeAdminUser(item.id, item.data())))
+}
 
-  const userRef = doc(db, ADMIN_USERS_COLLECTION, cleanUsername)
-  const snapshot = await getDoc(userRef)
-  if (snapshot.exists()) throw new Error('初始化帳號已存在，請直接登入。')
+async function saveAdminUserWithFirebase(user) {
+  const db = assertFirestoreReady()
+  const username = String(user.username || '').trim()
+  if (!username) throw new Error('請輸入帳號。')
+  if (!user.id && !user.password) throw new Error('新增帳號需要設定密碼。')
+  const payload = cleanAdminPayload({ ...user, username })
+  const ref = doc(db, ADMIN_USERS_COLLECTION, username)
+  const exists = await getDoc(ref)
+  await setDoc(ref, {
+    ...payload,
+    createdAt: exists.exists() ? exists.data().createdAt || new Date().toISOString() : new Date().toISOString(),
+    updatedAtServer: serverTimestamp(),
+    ...(exists.exists() ? {} : { createdAtServer: serverTimestamp() })
+  }, { merge: true })
+  return listAdminUsersWithFirebase()
+}
 
-  const now = new Date().toISOString()
-  const user = {
-    username: cleanUsername,
-    password,
-    role: 'owner',
-    displayName: '老闆',
-    isActive: true,
-    createdAt: now,
-    updatedAt: now
-  }
-  await setDoc(userRef, { ...user, createdAtServer: serverTimestamp(), updatedAtServer: serverTimestamp() })
-  return saveSession({ id: cleanUsername, ...user })
+async function deleteAdminUserWithFirebase(username) {
+  const db = assertFirestoreReady()
+  await deleteDoc(doc(db, ADMIN_USERS_COLLECTION, username))
+  return listAdminUsersWithFirebase()
 }
 
 export const authService = {
@@ -103,13 +125,19 @@ export const authService = {
     return env.useMockData ? loginWithMock(credentials) : loginWithFirebase(credentials)
   },
 
-  async bootstrapOwner() {
-    if (env.useMockData) throw new Error('模板模式不需要初始化正式老闆帳號。')
-    return bootstrapOwnerWithFirebase({ username: env.adminInitUsername, password: env.adminInitPassword })
+  async listAdminUsers() {
+    if (env.useMockData) return mockUsers.map(sanitizeUser)
+    return listAdminUsersWithFirebase()
   },
 
-  canBootstrapOwner() {
-    return !env.useMockData && Boolean(env.adminInitUsername && env.adminInitPassword)
+  async saveAdminUser(user) {
+    if (env.useMockData) throw new Error('模板模式不支援帳號管理。')
+    return saveAdminUserWithFirebase(user)
+  },
+
+  async deleteAdminUser(username) {
+    if (env.useMockData) throw new Error('模板模式不支援帳號管理。')
+    return deleteAdminUserWithFirebase(username)
   },
 
   logout() {
