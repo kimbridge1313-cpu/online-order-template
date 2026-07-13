@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, orderBy, query, setDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDocs, orderBy, query, setDoc } from 'firebase/firestore'
 import { assertFirestoreReady } from '../config/firebase'
 import { orderService } from './orderService'
 
@@ -120,5 +120,11 @@ export const firebaseDailyClosingService = {
 
     await setDoc(doc(db, COLLECTION, id), record)
     return record
+  },
+
+  async deleteClosing(id) {
+    const db = assertFirestoreReady()
+    await deleteDoc(doc(db, COLLECTION, id))
+    return this.listClosings()
   }
 }
