@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import OptionGroupEditor from './OptionGroupEditor'
-import { compressProductImage, formatFileSize } from '../utils/imageUpload'
+import { cloudinaryImageService } from '../services/cloudinaryImageService'
+import { formatFileSize } from '../utils/imageUpload'
 
 const emptyProduct = {
   name: '',
@@ -8,6 +9,7 @@ const emptyProduct = {
   price: 0,
   description: '',
   imageUrl: '',
+  imagePublicId: '',
   imageMeta: null,
   isAvailable: true,
   sortOrder: 999,
@@ -19,13 +21,13 @@ export default function ProductEditor({ product, categories = [], onCancel, onSa
   const [draft, setDraft] = useState(product || { ...emptyProduct, category: defaultCategory })
   const [imageMessage, setImageMessage] = useState('')
   const [imageError, setImageError] = useState('')
-  const [isCompressingImage, setIsCompressingImage] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
 
   useEffect(() => {
     setDraft(product || { ...emptyProduct, category: defaultCategory })
     setImageMessage('')
     setImageError('')
-    setIsCompressingImage(false)
+    setIsUploadingImage(false)
   }, [product, defaultCategory])
 
   function submit(event) {
@@ -44,15 +46,20 @@ export default function ProductEditor({ product, categories = [], onCancel, onSa
     if (!file) return
     setImageError('')
     setImageMessage('')
-    setIsCompressingImage(true)
+    setIsUploadingImage(true)
     try {
-      const result = await compressProductImage(file)
-      setDraft({ ...draft, imageUrl: result.imageUrl, imageMeta: result.imageMeta })
-      setImageMessage(`已壓縮：${formatFileSize(result.imageMeta.originalSize)} → ${formatFileSize(result.imageMeta.compressedSize)}`)
+      const result = await cloudinaryImageService.uploadProductImage(file)
+      setDraft({
+        ...draft,
+        imageUrl: result.imageUrl,
+        imagePublicId: result.imagePublicId,
+        imageMeta: result.imageMeta
+      })
+      setImageMessage(`已上傳 Cloudinary：${formatFileSize(result.imageMeta.originalSize)} → ${formatFileSize(result.imageMeta.compressedSize)}`)
     } catch (error) {
       setImageError(error.message || '圖片上傳失敗。')
     } finally {
-      setIsCompressingImage(false)
+      setIsUploadingImage(false)
     }
   }
 
@@ -91,17 +98,18 @@ export default function ProductEditor({ product, categories = [], onCancel, onSa
             </div>
             <div>
               <h3 className="font-black">商品圖片</h3>
-              <p className="mt-1 text-xs leading-5 text-muted">請選擇小於 1MB 的 jpg、png 或 webp。上傳時會自動壓縮成 WebP 並儲存在商品資料。</p>
+              <p className="mt-1 text-xs leading-5 text-muted">後台選擇圖片後，系統會先壓縮成 WebP，再上傳到 Cloudinary。商品資料只會保存圖片網址與 public_id。</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <label className="btn-secondary cursor-pointer">
-                  {isCompressingImage ? '壓縮中...' : '選擇圖片'}
-                  <input className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} disabled={isCompressingImage} />
+                <label className={`btn-secondary cursor-pointer ${isUploadingImage ? 'pointer-events-none opacity-60' : ''}`}>
+                  {isUploadingImage ? '上傳中...' : '選擇圖片上傳'}
+                  <input className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} disabled={isUploadingImage} />
                 </label>
-                {draft.imageUrl && <button className="btn-danger" type="button" onClick={() => setDraft({ ...draft, imageUrl: '', imageMeta: null })}>移除圖片</button>}
+                {draft.imageUrl && <button className="btn-danger" type="button" onClick={() => setDraft({ ...draft, imageUrl: '', imagePublicId: '', imageMeta: null })}>移除圖片</button>}
               </div>
               {imageMessage && <p className="mt-3 rounded-2xl bg-green-50 p-3 text-xs font-semibold text-green-700">{imageMessage}</p>}
               {imageError && <p className="mt-3 rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700">{imageError}</p>}
-              {draft.imageMeta?.compressedSize && <p className="mt-3 text-xs text-muted">目前圖片：{formatFileSize(draft.imageMeta.compressedSize)}｜{draft.imageMeta.width} × {draft.imageMeta.height}</p>}
+              {draft.imagePublicId && <p className="mt-3 break-all text-xs text-muted">Cloudinary：{draft.imagePublicId}</p>}
+              {draft.imageMeta?.compressedSize && <p className="mt-2 text-xs text-muted">目前圖片：{formatFileSize(draft.imageMeta.compressedSize)}｜{draft.imageMeta.width} × {draft.imageMeta.height}</p>}
             </div>
           </div>
         </section>
@@ -125,7 +133,7 @@ export default function ProductEditor({ product, categories = [], onCancel, onSa
       </div>
 
       <div className="mt-5 flex gap-2">
-        <button className="btn-primary" type="submit" disabled={isCompressingImage}>儲存商品</button>
+        <button className="btn-primary" type="submit" disabled={isUploadingImage}>儲存商品</button>
         <button className="btn-secondary" type="button" onClick={onCancel}>取消</button>
       </div>
     </form>
