@@ -18,6 +18,12 @@ export const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || ''
 }
 
+export const cloudinaryConfig = {
+  cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '',
+  uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '',
+  folder: import.meta.env.VITE_CLOUDINARY_FOLDER || 'online-order/products'
+}
+
 export const env = {
   appName: import.meta.env.VITE_APP_NAME || '線上訂餐系統',
   storeName: import.meta.env.VITE_STORE_NAME || '示範店家',
@@ -25,7 +31,9 @@ export const env = {
   lineLiffId: import.meta.env.VITE_LINE_LIFF_ID || '',
   useMockData: import.meta.env.VITE_USE_MOCK_DATA !== 'false',
   firebase: firebaseConfig,
+  cloudinary: cloudinaryConfig,
   hasFirebaseConfig: hasFirebaseConfig(firebaseConfig),
+  hasCloudinaryConfig: Boolean(cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset),
   isLiffEnabled: Boolean(import.meta.env.VITE_LINE_LIFF_ID),
   vercelEnv,
   isProd: import.meta.env.PROD,
