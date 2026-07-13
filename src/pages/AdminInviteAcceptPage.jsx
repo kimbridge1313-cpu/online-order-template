@@ -54,12 +54,13 @@ export default function AdminInviteAcceptPage({ onLogin }) {
         {loading ? <p className="mt-4 text-sm text-muted">正在確認邀請連結...</p> : invite ? (
           <>
             <p className="mt-3 text-sm leading-6 text-muted">你受邀成為{invite.role === 'owner' ? '老闆管理員' : `門店管理員${invite.storeName ? `｜${invite.storeName}` : ''}`}。請設定帳號密碼。</p>
+            <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-800">建立帳號時會同步綁定目前的 LINE 身份。請用 LINE 內建瀏覽器開啟此邀請連結，或依畫面完成 LINE 授權。</p>
             <form className="mt-5 space-y-3" onSubmit={submit}>
               <label className="block space-y-1"><span className="label">帳號</span><input className="input" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} autoComplete="username" required /></label>
               <label className="block space-y-1"><span className="label">顯示名稱</span><input className="input" value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="例如：中山店店長" /></label>
               <label className="block space-y-1"><span className="label">密碼</span><input className="input" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="new-password" required /></label>
               {message && <p className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
-              <button className="btn-primary w-full" type="submit" disabled={submitting}>{submitting ? '建立中...' : '建立並進入管理系統'}</button>
+              <button className="btn-primary w-full" type="submit" disabled={submitting}>{submitting ? '建立中...' : '綁定 LINE 並建立管理帳號'}</button>
             </form>
           </>
         ) : <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message || '邀請連結無效。'}</p>}
