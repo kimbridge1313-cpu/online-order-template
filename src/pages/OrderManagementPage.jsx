@@ -18,6 +18,7 @@ const tabs = [
 
 const diningLabels = { dine_in: '內用', takeaway: '自取', delivery: '外送', preorder: '預訂單' }
 const sourceLabels = { customer_online: '線上預約', counter: '門店點餐' }
+const customerCancellableStatuses = ['pending', 'accepted']
 
 export default function OrderManagementPage({ role: roleProp }) {
   const role = roleProp || readStorage(MOCK_ROLE_KEY, 'customer')
@@ -55,9 +56,11 @@ export default function OrderManagementPage({ role: roleProp }) {
     await loadOrders()
   }
 
-  async function cancelOrder(orderId) {
-    if (!isStore) return
-    const reason = window.prompt('取消原因（可留空）') || ''
+  async function cancelOrder(orderId, byCustomer = false) {
+    const order = orders.find((item) => item.id === orderId)
+    if (!order) return
+    if (byCustomer && !customerCancellableStatuses.includes(order.status)) return window.alert('此訂單目前狀態不可取消，請聯絡門店。')
+    const reason = byCustomer ? '顧客取消訂單' : window.prompt('取消原因（可留空）') || ''
     await orderService.cancelOrder(orderId, reason)
     await loadOrders()
   }
@@ -74,7 +77,7 @@ export default function OrderManagementPage({ role: roleProp }) {
       <section className="card p-5">
         <p className="text-xs font-semibold text-accent">{isStore ? 'Order Management' : 'My Orders'}</p>
         <h1 className="mt-1 text-3xl font-black">{isStore ? '訂單管理頁' : '我的訂單'}</h1>
-        {!isStore && <p className="mt-2 text-sm text-muted">這裡只會顯示你自己的線上訂單。</p>}
+        {!isStore && <p className="mt-2 text-sm text-muted">這裡只會顯示你自己的線上訂單。待接單或已接收訂單可自行取消。</p>}
         <div className="mt-5 grid gap-3 md:grid-cols-[1fr_220px_220px]">
           <div className="grid grid-cols-4 gap-2 rounded-3xl bg-cream p-2">
             {tabs.map((item) => (
@@ -94,7 +97,7 @@ export default function OrderManagementPage({ role: roleProp }) {
       </section>
 
       <section className="card mt-6 overflow-hidden">
-        <div className="hidden grid-cols-[150px_1fr_120px_110px_130px_190px] gap-3 border-b border-line bg-cream px-4 py-3 text-xs font-bold text-muted lg:grid">
+        <div className="hidden grid-cols-[150px_1fr_120px_110px_130px_210px] gap-3 border-b border-line bg-cream px-4 py-3 text-xs font-bold text-muted lg:grid">
           <span>訂單</span>
           <span>顧客 / 品項</span>
           <span>用餐</span>
@@ -109,9 +112,10 @@ export default function OrderManagementPage({ role: roleProp }) {
             const expanded = expandedOrderId === order.id
             const isOnlineOrder = order.source === 'customer_online'
             const needsAccept = isOnlineOrder && order.status === 'pending'
+            const canCustomerCancel = !isStore && customerCancellableStatuses.includes(order.status)
             return (
               <article key={order.id} className="bg-white px-4 py-4">
-                <div className="grid gap-3 lg:grid-cols-[150px_1fr_120px_110px_130px_190px] lg:items-center">
+                <div className="grid gap-3 lg:grid-cols-[150px_1fr_120px_110px_130px_210px] lg:items-center">
                   <button className="text-left" type="button" onClick={() => setExpandedOrderId(expanded ? null : order.id)}>
                     <p className="font-black text-ink">{order.orderNumber}</p>
                     <p className="mt-1 text-xs text-muted">{new Date(order.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</p>
@@ -137,6 +141,7 @@ export default function OrderManagementPage({ role: roleProp }) {
                     {isStore && order.status !== 'cancelled' && order.status !== 'completed' && <button className="btn-secondary py-2" type="button" onClick={() => setEditingOrder(order)}><Pencil size={15} className="inline-block" /> 修改</button>}
                     {isStore && order.status !== 'cancelled' && <button className="btn-danger py-2" type="button" onClick={() => cancelOrder(order.id)}><XCircle size={15} className="inline-block" /> 取消</button>}
                     {!isStore && <button className="btn-secondary py-2" type="button" onClick={() => setExpandedOrderId(expanded ? null : order.id)}>{expanded ? '收合' : '明細'}</button>}
+                    {canCustomerCancel && <button className="btn-danger py-2" type="button" onClick={() => cancelOrder(order.id, true)}><XCircle size={15} className="inline-block" /> 取消訂單</button>}
                   </div>
                 </div>
 
