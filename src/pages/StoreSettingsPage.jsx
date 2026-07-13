@@ -5,15 +5,32 @@ import { readStorage, writeStorage } from '../utils/storage'
 const STORE_SETTINGS_KEY = 'online-order-template-store-settings'
 const STORE_LIST_KEY = 'online-order-template-store-list'
 const ROLE_STORAGE_KEY = 'online-order-template-role'
-const defaultSettings = { brandName: '示範店家', tableNumberEnabled: false, tableNumbers: [] }
+const defaultDiningModules = { dine_in: true, takeaway: true, delivery: false }
+const diningModuleOptions = [
+  { key: 'dine_in', label: '內用', description: '適合現場座位、桌邊點餐，可搭配桌號設定。' },
+  { key: 'takeaway', label: '自取', description: '適合顧客預約後到店取餐。' },
+  { key: 'delivery', label: '外送', description: '適合需要顧客填寫外送地址的訂單。' }
+]
+const defaultSettings = { brandName: '示範店家', tableNumberEnabled: false, tableNumbers: [], diningModules: defaultDiningModules }
 const defaultStores = [
   { id: 'demo-store', name: '示範門店', accountName: 'demo-store-account', latitude: 23.6978, longitude: 120.9605, address: '示範地址', isActive: true }
 ]
 
+function normalizeSettings(rawSettings = {}) {
+  return {
+    ...defaultSettings,
+    ...rawSettings,
+    diningModules: {
+      ...defaultDiningModules,
+      ...(rawSettings.diningModules || {})
+    }
+  }
+}
+
 export default function StoreSettingsPage({ role: roleProp }) {
   const role = roleProp || readStorage(ROLE_STORAGE_KEY, 'customer')
   const isOwner = role === 'owner'
-  const [settings, setSettings] = useState(() => ({ ...defaultSettings, ...readStorage(STORE_SETTINGS_KEY, defaultSettings) }))
+  const [settings, setSettings] = useState(() => normalizeSettings(readStorage(STORE_SETTINGS_KEY, defaultSettings)))
   const [stores, setStores] = useState(() => readStorage(STORE_LIST_KEY, defaultStores))
   const [tableDraft, setTableDraft] = useState('')
   const [editingTableId, setEditingTableId] = useState(null)
@@ -22,9 +39,21 @@ export default function StoreSettingsPage({ role: roleProp }) {
   const [editingStoreId, setEditingStoreId] = useState(null)
 
   function updateSettings(nextSettings) {
-    setSettings(nextSettings)
-    writeStorage(STORE_SETTINGS_KEY, nextSettings)
+    const normalized = normalizeSettings(nextSettings)
+    setSettings(normalized)
+    writeStorage(STORE_SETTINGS_KEY, normalized)
     window.dispatchEvent(new Event('store-settings-updated'))
+  }
+
+  function toggleDiningModule(moduleKey) {
+    const currentModules = { ...defaultDiningModules, ...(settings.diningModules || {}) }
+    const nextModules = { ...currentModules, [moduleKey]: !currentModules[moduleKey] }
+    const enabledCount = Object.values(nextModules).filter(Boolean).length
+    if (enabledCount === 0) {
+      window.alert('至少需要開啟一種用餐方式。')
+      return
+    }
+    updateSettings({ ...settings, diningModules: nextModules })
   }
 
   function persistStores(nextStores) {
@@ -95,6 +124,8 @@ export default function StoreSettingsPage({ role: roleProp }) {
     )
   }
 
+  const diningModules = { ...defaultDiningModules, ...(settings.diningModules || {}) }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       <section className="card p-5">
@@ -113,6 +144,24 @@ export default function StoreSettingsPage({ role: roleProp }) {
             <span className="label">品牌名稱</span>
             <input className="input" value={settings.brandName || ''} onChange={(event) => updateSettings({ ...settings, brandName: event.target.value })} placeholder="例如：先生手作千層" />
           </label>
+        </section>
+      )}
+
+      {isOwner && (
+        <section className="card mt-5 p-5">
+          <h2 className="text-xl font-black">用餐方式模組</h2>
+          <p className="mt-2 text-sm text-muted">選擇訂餐頁要開啟的用餐方式。外送開啟後，顧客與門店點餐時會出現外送地址欄位。</p>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {diningModuleOptions.map((item) => (
+              <label key={item.key} className="flex min-h-32 items-start justify-between gap-4 rounded-3xl border border-line bg-white p-4">
+                <span>
+                  <span className="block font-bold text-ink">{item.label}</span>
+                  <span className="mt-2 block text-xs leading-5 text-muted">{item.description}</span>
+                </span>
+                <input className="mt-1 h-5 w-5 shrink-0" type="checkbox" checked={!!diningModules[item.key]} onChange={() => toggleDiningModule(item.key)} />
+              </label>
+            ))}
+          </div>
         </section>
       )}
 
