@@ -83,12 +83,21 @@ async function acceptInviteWithFirebase({ code, username, password, displayName 
   const cleanUsername = String(username || '').trim()
   if (!cleanUsername) throw new Error('請輸入帳號。')
   if (!password) throw new Error('請設定密碼。')
+  if (!env.isLiffEnabled) throw new Error('尚未設定 LINE LIFF ID，無法綁定 LINE 身份。')
+
+  const lineProfile = await liffService.getProfile({ requireLogin: true }).catch((error) => {
+    console.warn('LINE profile required for invite accept:', error)
+    return null
+  })
+
+  if (!lineProfile?.userId) {
+    throw new Error('請先完成 LINE 授權登入，再建立管理帳號。')
+  }
 
   const userRef = doc(db, ADMIN_USERS_COLLECTION, cleanUsername)
   const exists = await getDoc(userRef)
   if (exists.exists()) throw new Error('此帳號已存在，請改用其他帳號。')
 
-  const lineProfile = await liffService.getProfile({ requireLogin: false }).catch(() => null)
   const now = new Date().toISOString()
   const user = {
     username: cleanUsername,
@@ -98,27 +107,37 @@ async function acceptInviteWithFirebase({ code, username, password, displayName 
     storeName: invite.role === 'owner' ? '' : invite.storeName || '',
     displayName: displayName || cleanUsername,
     isActive: true,
+    lineUserId: lineProfile.userId,
+    lineDisplayName: lineProfile.displayName || '',
+    linePictureUrl: lineProfile.pictureUrl || '',
+    lineBoundAt: now,
     createdAt: now,
     updatedAt: now,
     createdAtServer: serverTimestamp(),
-    updatedAtServer: serverTimestamp(),
-    ...(lineProfile?.userId ? {
-      lineUserId: lineProfile.userId,
-      lineDisplayName: lineProfile.displayName || '',
-      linePictureUrl: lineProfile.pictureUrl || '',
-      lineBoundAt: now
-    } : {})
+    updatedAtServer: serverTimestamp()
   }
   await setDoc(userRef, user)
   await updateDoc(doc(db, INVITES_COLLECTION, invite.code), {
     isUsed: true,
     usedBy: cleanUsername,
+    usedLineUserId: lineProfile.userId,
     usedAt: now,
     usedAtServer: serverTimestamp(),
     updatedAt: now,
     updatedAtServer: serverTimestamp()
   })
-  return { username: cleanUsername, role: user.role, storeId: user.storeId, storeName: user.storeName, displayName: user.displayName, isActive: true }
+  return {
+    username: cleanUsername,
+    role: user.role,
+    storeId: user.storeId,
+    storeName: user.storeName,
+    displayName: user.displayName,
+    isActive: true,
+    lineUserId: lineProfile.userId,
+    lineDisplayName: lineProfile.displayName || '',
+    linePictureUrl: lineProfile.pictureUrl || '',
+    lineBoundAt: now
+  }
 }
 
 async function revokeInviteWithFirebase(code) {
