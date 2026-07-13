@@ -27,8 +27,6 @@ export const env = {
   firebase: firebaseConfig,
   hasFirebaseConfig: hasFirebaseConfig(firebaseConfig),
   isLiffEnabled: Boolean(import.meta.env.VITE_LINE_LIFF_ID),
-  adminInitUsername: import.meta.env.VITE_ADMIN_INIT_USERNAME || '',
-  adminInitPassword: import.meta.env.VITE_ADMIN_INIT_PASSWORD || '',
   vercelEnv,
   isProd: import.meta.env.PROD,
   isDev: import.meta.env.DEV,
