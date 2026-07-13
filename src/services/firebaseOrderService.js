@@ -9,6 +9,10 @@ function cleanOrder(order) {
   return JSON.parse(JSON.stringify(order || {}))
 }
 
+function defaultPaymentStatus(payload = {}) {
+  return payload.paymentStatus || 'unpaid'
+}
+
 export const firebaseOrderService = {
   async listOrders() {
     const db = assertFirestoreReady()
@@ -25,6 +29,10 @@ export const firebaseOrderService = {
       id,
       orderNumber: createOrderNumber(),
       status: payload.source === 'counter' ? 'accepted' : 'pending',
+      paymentStatus: defaultPaymentStatus(payload),
+      paymentMethod: payload.paymentMethod || '',
+      paidAt: payload.paidAt || '',
+      paidBy: payload.paidBy || '',
       createdAt: now,
       updatedAt: now
     })
@@ -48,6 +56,15 @@ export const firebaseOrderService = {
     })
     if (order && order.source === 'customer_online') await lineNotificationService.notifyAcceptedOrder(order)
     return order
+  },
+
+  async markOrderPaid(orderId, { paymentMethod = 'cash', paidBy = '' } = {}) {
+    return this.updateOrder(orderId, {
+      paymentStatus: 'paid',
+      paymentMethod,
+      paidBy,
+      paidAt: new Date().toISOString()
+    })
   },
 
   async cancelOrder(orderId, cancelReason = '') {
