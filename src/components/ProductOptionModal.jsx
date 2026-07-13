@@ -38,6 +38,7 @@ export default function ProductOptionModal({ product, onClose, onAdd }) {
       productId: product.id,
       name: product.name,
       basePrice: product.price,
+      imageUrl: product.imageUrl || '',
       quantity,
       selectedOptions,
       unitPrice,
@@ -57,6 +58,12 @@ export default function ProductOptionModal({ product, onClose, onAdd }) {
           </div>
           <button className="rounded-2xl bg-white p-3" onClick={onClose} type="button"><X size={20} /></button>
         </div>
+
+        {product.imageUrl && (
+          <div className="mt-4 overflow-hidden rounded-3xl border border-line bg-white">
+            <img className="max-h-72 w-full object-cover" src={product.imageUrl} alt={product.name} loading="lazy" />
+          </div>
+        )}
 
         <div className="mt-5 space-y-5">
           {(product.optionGroups || []).map((group) => (
