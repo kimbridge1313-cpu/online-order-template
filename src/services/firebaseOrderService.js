@@ -73,6 +73,16 @@ export const firebaseOrderService = {
     })
   },
 
+  async markOrderUnpaid(orderId) {
+    return this.updateOrder(orderId, {
+      paymentStatus: 'unpaid',
+      paymentMethod: '',
+      paidBy: '',
+      paidAt: '',
+      paymentRevertedAt: new Date().toISOString()
+    })
+  },
+
   async cancelOrder(orderId, cancelReason = '') {
     const order = await this.updateOrder(orderId, {
       status: 'cancelled',
