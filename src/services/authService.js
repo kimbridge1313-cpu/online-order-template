@@ -157,9 +157,9 @@ export const authService = {
     return env.useMockData ? loginWithMock(credentials) : loginWithFirebase(credentials)
   },
 
-  async loginWithLineProfile() {
+  async loginWithLineProfile({ requireLogin = false } = {}) {
     if (env.useMockData || !env.isLiffEnabled) return null
-    const profile = await liffService.getProfile({ requireLogin: false })
+    const profile = await liffService.getProfile({ requireLogin })
     if (!profile?.userId) return null
     return loginWithLineUserIdFirebase(profile.userId)
   },
