@@ -45,6 +45,29 @@ class AppErrorBoundary extends Component {
   }
 }
 
+function RoleSwitcher({ role, onChange, compact = false }) {
+  if (!env.useMockData) return null
+  if (compact) {
+    return (
+      <label className="space-y-1">
+        <span className="text-xs font-bold text-muted">模板身份</span>
+        <select className="input" value={role} onChange={(event) => onChange(event.target.value)}>
+          <option value="customer">顧客</option>
+          <option value="store">門店</option>
+          <option value="owner">老闆</option>
+        </select>
+      </label>
+    )
+  }
+  return (
+    <select className="rounded-2xl border border-line bg-white px-3 py-3 text-sm font-bold text-ink" value={role} onChange={(event) => onChange(event.target.value)} aria-label="模板身份切換">
+      <option value="customer">顧客</option>
+      <option value="store">門店</option>
+      <option value="owner">老闆</option>
+    </select>
+  )
+}
+
 function AppShell() {
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
@@ -69,7 +92,17 @@ function AppShell() {
     }
   }, [])
 
+  useEffect(() => {
+    if (env.useMockData) return
+    if (role !== 'customer') {
+      writeStorage(ROLE_STORAGE_KEY, 'customer')
+      setRole('customer')
+      if (page === 'products' || page === 'settings' || page === 'closing') setPage('order')
+    }
+  }, [role, page])
+
   function switchRole(nextRole) {
+    if (!env.useMockData) return
     writeStorage(ROLE_STORAGE_KEY, nextRole)
     setRole(nextRole)
     if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
@@ -77,6 +110,7 @@ function AppShell() {
   }
 
   function refreshRole() {
+    if (!env.useMockData) return
     const nextRole = readStorage(ROLE_STORAGE_KEY, 'customer')
     setRole(nextRole)
     if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
@@ -117,11 +151,7 @@ function AppShell() {
             <h1 className="truncate text-lg font-black text-ink">{env.appName}</h1>
           </div>
           <div className="hidden items-center gap-2 md:flex">
-            <select className="rounded-2xl border border-line bg-white px-3 py-3 text-sm font-bold text-ink" value={role} onChange={(event) => switchRole(event.target.value)} aria-label="模板身份切換">
-              <option value="customer">顧客</option>
-              <option value="store">門店</option>
-              <option value="owner">老闆</option>
-            </select>
+            <RoleSwitcher role={role} onChange={switchRole} />
             <nav className="flex gap-2">
               {navItems.map((item) => {
                 const Icon = item.icon
@@ -137,14 +167,7 @@ function AppShell() {
         </div>
         {open && (
           <nav className="grid gap-2 border-t border-line px-4 py-3 md:hidden">
-            <label className="space-y-1">
-              <span className="text-xs font-bold text-muted">模板身份</span>
-              <select className="input" value={role} onChange={(event) => switchRole(event.target.value)}>
-                <option value="customer">顧客</option>
-                <option value="store">門店</option>
-                <option value="owner">老闆</option>
-              </select>
-            </label>
+            <RoleSwitcher role={role} onChange={switchRole} compact />
             {navItems.map((item) => {
               const Icon = item.icon
               return (
