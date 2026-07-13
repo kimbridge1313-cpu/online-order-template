@@ -12,10 +12,11 @@ const MOCK_ROLE_KEY = 'online-order-template-role'
 const tabs = [
   { value: 'all', label: '全部' },
   { value: 'dine_in', label: '內用' },
-  { value: 'takeaway', label: '自取' }
+  { value: 'takeaway', label: '自取' },
+  { value: 'delivery', label: '外送' }
 ]
 
-const diningLabels = { dine_in: '內用', takeaway: '自取', preorder: '預訂單' }
+const diningLabels = { dine_in: '內用', takeaway: '自取', delivery: '外送', preorder: '預訂單' }
 const sourceLabels = { customer_online: '線上預約', counter: '門店點餐' }
 
 export default function OrderManagementPage({ role: roleProp }) {
@@ -81,9 +82,9 @@ export default function OrderManagementPage({ role: roleProp }) {
         <h1 className="mt-1 text-3xl font-black">{isStore ? '訂單管理頁' : '我的訂單'}</h1>
         {!isStore && <p className="mt-2 text-sm text-muted">這裡只會顯示你自己的線上訂單。</p>}
         <div className="mt-5 grid gap-3 md:grid-cols-[1fr_220px_220px]">
-          <div className="grid grid-cols-3 gap-2 rounded-3xl bg-cream p-2">
+          <div className="grid grid-cols-4 gap-2 rounded-3xl bg-cream p-2">
             {tabs.map((item) => (
-              <button key={item.value} className={`rounded-2xl px-4 py-3 text-sm font-bold ${tab === item.value ? 'bg-white text-brand shadow' : 'text-muted'}`} onClick={() => setTab(item.value)} type="button">{item.label}</button>
+              <button key={item.value} className={`rounded-2xl px-3 py-3 text-sm font-bold ${tab === item.value ? 'bg-white text-brand shadow' : 'text-muted'}`} onClick={() => setTab(item.value)} type="button">{item.label}</button>
             ))}
           </div>
           <input className="input" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
@@ -131,6 +132,7 @@ export default function OrderManagementPage({ role: roleProp }) {
                   <div className="text-sm">
                     <p className="font-bold">{diningLabels[order.diningType] || order.diningType}</p>
                     {order.pickupTime && <p className="mt-1 text-xs text-muted">{order.pickupTime}</p>}
+                    {order.diningType === 'delivery' && order.deliveryAddress && <p className="mt-1 line-clamp-1 text-xs text-muted">{order.deliveryAddress}</p>}
                   </div>
 
                   <p className="text-lg font-black text-brand">{formatPrice(order.totalAmount)}</p>
@@ -150,6 +152,8 @@ export default function OrderManagementPage({ role: roleProp }) {
                       <p>手機：{order.customer?.phone || '未填'}</p>
                       <p>門店：{order.store?.name || '未指定'}</p>
                       <p>來源：{sourceLabels[order.source] || order.source}</p>
+                      <p>用餐方式：{diningLabels[order.diningType] || order.diningType}</p>
+                      {order.deliveryAddress && <p className="md:col-span-2">外送地址：{order.deliveryAddress}</p>}
                       {order.acceptedAt && <p>接單時間：{new Date(order.acceptedAt).toLocaleString('zh-TW')}</p>}
                       {order.note && <p className="md:col-span-2">備註：{order.note}</p>}
                       {order.cancelReason && <p className="text-red-700 md:col-span-2">取消原因：{order.cancelReason}</p>}
