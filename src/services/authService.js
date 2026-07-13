@@ -67,6 +67,29 @@ async function loginWithFirebase({ username, password }) {
   return saveSession(user)
 }
 
+async function bootstrapOwnerWithFirebase({ username, password }) {
+  const db = assertFirestoreReady()
+  const cleanUsername = String(username || '').trim()
+  if (!cleanUsername || !password) throw new Error('請先在 Vercel 設定初始化帳號與密碼。')
+
+  const userRef = doc(db, ADMIN_USERS_COLLECTION, cleanUsername)
+  const snapshot = await getDoc(userRef)
+  if (snapshot.exists()) throw new Error('初始化帳號已存在，請直接登入。')
+
+  const now = new Date().toISOString()
+  const user = {
+    username: cleanUsername,
+    password,
+    role: 'owner',
+    displayName: '老闆',
+    isActive: true,
+    createdAt: now,
+    updatedAt: now
+  }
+  await setDoc(userRef, { ...user, createdAtServer: serverTimestamp(), updatedAtServer: serverTimestamp() })
+  return saveSession({ id: cleanUsername, ...user })
+}
+
 export const authService = {
   getSession() {
     return readStorage(ADMIN_SESSION_KEY, null)
@@ -78,6 +101,15 @@ export const authService = {
 
   async login(credentials) {
     return env.useMockData ? loginWithMock(credentials) : loginWithFirebase(credentials)
+  },
+
+  async bootstrapOwner() {
+    if (env.useMockData) throw new Error('模板模式不需要初始化正式老闆帳號。')
+    return bootstrapOwnerWithFirebase({ username: env.adminInitUsername, password: env.adminInitPassword })
+  },
+
+  canBootstrapOwner() {
+    return !env.useMockData && Boolean(env.adminInitUsername && env.adminInitPassword)
   },
 
   logout() {
