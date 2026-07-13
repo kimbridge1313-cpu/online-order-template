@@ -24,6 +24,21 @@ function getTodayDate() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function getMonthStartDate() {
+  const date = new Date()
+  date.setDate(1)
+  return date.toISOString().slice(0, 10)
+}
+
+function getOrderPaidDate(order) {
+  return order.paidAt?.slice(0, 10) || ''
+}
+
+function isSameStore(order, storeId) {
+  if (!storeId || storeId === 'all') return true
+  return order.store?.id === storeId || order.storeId === storeId
+}
+
 function StatCard({ label, value, sub }) {
   return (
     <div className="rounded-3xl border border-line bg-white p-4">
@@ -43,10 +58,14 @@ export default function DailyClosingPage({ role: roleProp }) {
   const [storeId, setStoreId] = useState(isOwner ? 'all' : firstStore.id)
   const [summary, setSummary] = useState(null)
   const [closings, setClosings] = useState([])
+  const [allOrders, setAllOrders] = useState([])
   const [cashActual, setCashActual] = useState('')
   const [note, setNote] = useState('')
   const [message, setMessage] = useState('')
   const [collectingOrder, setCollectingOrder] = useState(null)
+  const [salesRangeStart, setSalesRangeStart] = useState(getMonthStartDate())
+  const [salesRangeEnd, setSalesRangeEnd] = useState(getTodayDate())
+  const [salesStoreId, setSalesStoreId] = useState('all')
 
   const selectedStore = useMemo(() => {
     if (storeId === 'all') return { id: 'all', name: '全部門店' }
@@ -56,10 +75,47 @@ export default function DailyClosingPage({ role: roleProp }) {
   const cashExpected = Number(summary?.cashBaseAmount || summary?.netSales || 0)
   const cashDifference = Number(cashActual || 0) - cashExpected
 
+  const salesReport = useMemo(() => {
+    if (!isOwner) return null
+    const reportOrders = allOrders.filter((order) => {
+      const paidDate = getOrderPaidDate(order)
+      if (order.status === 'cancelled') return false
+      if ((order.paymentStatus || 'unpaid') !== 'paid') return false
+      if (!paidDate) return false
+      if (salesRangeStart && paidDate < salesRangeStart) return false
+      if (salesRangeEnd && paidDate > salesRangeEnd) return false
+      if (!isSameStore(order, salesStoreId)) return false
+      return true
+    })
+    const total = reportOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)
+    const onlineOrders = reportOrders.filter((order) => order.source === 'customer_online')
+    const counterOrders = reportOrders.filter((order) => order.source === 'counter')
+    const byMethod = paymentMethodOptions.reduce((acc, method) => {
+      acc[method.value] = reportOrders
+        .filter((order) => (order.paymentMethod || 'cash') === method.value)
+        .reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)
+      return acc
+    }, {})
+    return {
+      orders: reportOrders,
+      orderCount: reportOrders.length,
+      total,
+      averageOrderAmount: reportOrders.length ? Math.round(total / reportOrders.length) : 0,
+      onlineAmount: onlineOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0),
+      counterAmount: counterOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0),
+      byMethod
+    }
+  }, [allOrders, isOwner, salesRangeStart, salesRangeEnd, salesStoreId])
+
   async function loadData() {
-    const nextSummary = await dailyClosingService.getSummary({ businessDate, storeId })
+    const [nextSummary, nextClosings, nextOrders] = await Promise.all([
+      dailyClosingService.getSummary({ businessDate, storeId }),
+      dailyClosingService.listClosings(),
+      orderService.listOrders()
+    ])
     setSummary(nextSummary)
-    setClosings(await dailyClosingService.listClosings())
+    setClosings(nextClosings)
+    setAllOrders(nextOrders)
     const existing = nextSummary.existingClosing
     setCashActual(existing ? String(existing.cashActual || 0) : String(nextSummary.cashBaseAmount || nextSummary.netSales || 0))
     setNote(existing?.note || '')
@@ -147,6 +203,41 @@ export default function DailyClosingPage({ role: roleProp }) {
           </label>
         </div>
       </section>
+
+      {isOwner && salesReport && (
+        <section className="card mt-5 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-accent">Owner Report</p>
+              <h2 className="mt-1 text-2xl font-black">指定期間營業額</h2>
+              <p className="mt-1 text-sm text-muted">依收款日期 paidAt 統計；只計入已收款且未取消的訂單。</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-[180px_180px_1fr]">
+            <label className="space-y-1">
+              <span className="label">開始日期</span>
+              <input className="input" type="date" value={salesRangeStart} onChange={(event) => setSalesRangeStart(event.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="label">結束日期</span>
+              <input className="input" type="date" value={salesRangeEnd} onChange={(event) => setSalesRangeEnd(event.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="label">門店</span>
+              <select className="input" value={salesStoreId} onChange={(event) => setSalesStoreId(event.target.value)}>
+                <option value="all">全部門店</option>
+                {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+              </select>
+            </label>
+          </div>
+          <section className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="區間實收營業額" value={formatPrice(salesReport.total)} sub={`${salesRangeStart || '不限'} ～ ${salesRangeEnd || '不限'}`} />
+            <StatCard label="區間訂單數" value={salesReport.orderCount} sub={`平均 ${formatPrice(salesReport.averageOrderAmount)}`} />
+            <StatCard label="線上收款" value={formatPrice(salesReport.onlineAmount)} sub={`門店收款 ${formatPrice(salesReport.counterAmount)}`} />
+            <StatCard label="現金 / LINE Pay" value={`${formatPrice(salesReport.byMethod.cash || 0)} / ${formatPrice(salesReport.byMethod.linepay || 0)}`} sub={`轉帳 ${formatPrice(salesReport.byMethod.transfer || 0)}｜其他 ${formatPrice(salesReport.byMethod.other || 0)}`} />
+          </section>
+        </section>
+      )}
 
       {summary && (
         <>
