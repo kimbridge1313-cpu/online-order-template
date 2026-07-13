@@ -12,6 +12,16 @@ function saveAll(orders) {
   writeStorage(STORAGE_KEY, orders)
 }
 
+function defaultPaymentStatus(payload = {}) {
+  if (payload.paymentStatus) return payload.paymentStatus
+  return payload.source === 'counter' ? 'paid' : 'unpaid'
+}
+
+function defaultPaidAt(payload = {}, now = '') {
+  if (payload.paidAt) return payload.paidAt
+  return payload.source === 'counter' ? now : ''
+}
+
 export const mockOrderService = {
   async listOrders() {
     return list().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -23,10 +33,10 @@ export const mockOrderService = {
       id: `order-${Date.now()}`,
       orderNumber: createOrderNumber(),
       status: payload.source === 'counter' ? 'accepted' : 'pending',
-      paymentStatus: payload.paymentStatus || 'unpaid',
-      paymentMethod: payload.paymentMethod || '',
-      paidAt: payload.paidAt || '',
-      paidBy: payload.paidBy || '',
+      paymentStatus: defaultPaymentStatus(payload),
+      paymentMethod: payload.paymentMethod || (payload.source === 'counter' ? 'cash' : ''),
+      paidAt: defaultPaidAt(payload, now),
+      paidBy: payload.paidBy || (payload.source === 'counter' ? '門店帳號' : ''),
       createdAt: now,
       updatedAt: now
     }
