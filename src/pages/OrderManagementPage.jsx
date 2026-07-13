@@ -20,7 +20,13 @@ const diningLabels = { dine_in: '內用', takeaway: '自取', delivery: '外送'
 const sourceLabels = { customer_online: '線上預約', counter: '門店點餐' }
 const customerCancellableStatuses = ['pending', 'accepted']
 const paymentLabels = { unpaid: '未收款', paid: '已收款', refunded: '已退款' }
-const paymentMethodLabels = { cash: '現金', linepay: 'LINE Pay', transfer: '轉帳', other: '其他' }
+const paymentMethodOptions = [
+  { value: 'cash', label: '現金' },
+  { value: 'linepay', label: 'LINE Pay' },
+  { value: 'transfer', label: '轉帳' },
+  { value: 'other', label: '其他' }
+]
+const paymentMethodLabels = paymentMethodOptions.reduce((acc, item) => ({ ...acc, [item.value]: item.label }), {})
 
 function getPaymentStatus(order) {
   return order.paymentStatus || 'unpaid'
@@ -36,6 +42,7 @@ export default function OrderManagementPage({ role: roleProp }) {
   const [date, setDate] = useState(isStore ? new Date().toISOString().slice(0, 10) : '')
   const [expandedOrderId, setExpandedOrderId] = useState(null)
   const [editingOrder, setEditingOrder] = useState(null)
+  const [collectingOrder, setCollectingOrder] = useState(null)
 
   async function loadOrders() {
     setOrders(await orderService.listOrders())
@@ -62,11 +69,10 @@ export default function OrderManagementPage({ role: roleProp }) {
     await loadOrders()
   }
 
-  async function markPaid(order) {
+  async function markPaid(order, paymentMethod) {
     if (!isStore) return
-    const method = window.prompt('收款方式：cash 現金 / linepay LINE Pay / transfer 轉帳 / other 其他', order.paymentMethod || 'cash') || 'cash'
-    const normalizedMethod = ['cash', 'linepay', 'transfer', 'other'].includes(method) ? method : 'other'
-    await orderService.markOrderPaid(order.id, { paymentMethod: normalizedMethod, paidBy: role })
+    await orderService.markOrderPaid(order.id, { paymentMethod, paidBy: role })
+    setCollectingOrder(null)
     await loadOrders()
   }
 
@@ -161,7 +167,7 @@ export default function OrderManagementPage({ role: roleProp }) {
 
                   <div className="flex flex-wrap gap-2">
                     {isStore && needsAccept && <button className="btn-secondary py-2" type="button" onClick={() => acceptOrder(order.id)}>接單</button>}
-                    {needsPayment && <button className="btn-primary py-2" type="button" onClick={() => markPaid(order)}>收款</button>}
+                    {needsPayment && <button className="btn-primary py-2" type="button" onClick={() => setCollectingOrder(order)}>收款</button>}
                     {isStore && order.status !== 'cancelled' && order.status !== 'completed' && <button className="btn-secondary py-2" type="button" onClick={() => setEditingOrder(order)}><Pencil size={15} className="inline-block" /> 修改</button>}
                     {isStore && order.status !== 'cancelled' && <button className="btn-danger py-2" type="button" onClick={() => cancelOrder(order.id)}><XCircle size={15} className="inline-block" /> 取消</button>}
                     {!isStore && <button className="btn-secondary py-2" type="button" onClick={() => setExpandedOrderId(expanded ? null : order.id)}>{expanded ? '收合' : '明細'}</button>}
@@ -202,6 +208,24 @@ export default function OrderManagementPage({ role: roleProp }) {
       </section>
 
       {isStore && editingOrder && <OrderEditModal order={editingOrder} onClose={() => setEditingOrder(null)} onSave={saveOrder} />}
+
+      {collectingOrder && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 md:items-center md:p-6">
+          <div className="w-full max-w-md rounded-t-3xl bg-cream p-5 shadow-soft md:rounded-3xl">
+            <p className="text-xs font-semibold text-accent">選擇收款方式</p>
+            <h2 className="mt-1 text-2xl font-black">{collectingOrder.orderNumber}</h2>
+            <p className="mt-2 text-sm text-muted">{collectingOrder.customer?.name || '未填姓名'}｜{formatPrice(collectingOrder.totalAmount)}</p>
+            <div className="mt-5 grid gap-2">
+              {paymentMethodOptions.map((option) => (
+                <button key={option.value} className="btn-secondary w-full justify-center" type="button" onClick={() => markPaid(collectingOrder, option.value)}>
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <button className="mt-4 w-full text-sm font-bold text-muted underline" type="button" onClick={() => setCollectingOrder(null)}>取消</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
