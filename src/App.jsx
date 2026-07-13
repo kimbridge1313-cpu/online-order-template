@@ -44,6 +44,11 @@ class AppErrorBoundary extends Component {
   }
 }
 
+function isAdminRoute() {
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/'
+  return pathname === '/admin' || pathname.startsWith('/admin/')
+}
+
 function AdminLoginPage({ onLogin }) {
   const [form, setForm] = useState({ username: '', password: '' })
   const [message, setMessage] = useState('')
@@ -67,15 +72,15 @@ function AdminLoginPage({ onLogin }) {
     <div className="mx-auto max-w-xl px-4 py-10">
       <form className="card p-7" onSubmit={submit}>
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cream text-brand"><UserRound size={24} /></div>
-        <p className="mt-5 text-xs font-semibold text-accent">Admin Login</p>
-        <h1 className="mt-1 text-3xl font-black">後台登入</h1>
-        <p className="mt-3 text-sm leading-6 text-muted">老闆與門店使用帳號密碼登入。顧客訂餐不需要登入後台。</p>
+        <p className="mt-5 text-xs font-semibold text-accent">Management</p>
+        <h1 className="mt-1 text-3xl font-black">管理入口</h1>
+        <p className="mt-3 text-sm leading-6 text-muted">老闆與門店使用帳號密碼登入。顧客請回到一般點餐頁。</p>
         <div className="mt-5 space-y-3">
           <label className="block space-y-1"><span className="label">帳號</span><input className="input" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} autoComplete="username" required /></label>
           <label className="block space-y-1"><span className="label">密碼</span><input className="input" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="current-password" required /></label>
         </div>
         {message && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
-        <button className="btn-primary mt-5 w-full" type="submit" disabled={submitting}>{submitting ? '登入中...' : '登入後台'}</button>
+        <button className="btn-primary mt-5 w-full" type="submit" disabled={submitting}>{submitting ? '登入中...' : '進入管理系統'}</button>
       </form>
     </div>
   )
@@ -83,27 +88,33 @@ function AdminLoginPage({ onLogin }) {
 
 function AppShell() {
   const showTemplateRoleSwitch = env.useMockData
+  const adminRoute = isAdminRoute()
   const [page, setPage] = useState('order')
   const [open, setOpen] = useState(false)
   const [role, setRole] = useState(() => showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : 'customer')
   const [adminSession, setAdminSession] = useState(() => authService.getSession())
   const [storeSettings, setStoreSettings] = useState({ brandName: env.storeName })
-  const isAdmin = role === 'store' || role === 'owner'
   const isLoggedAdmin = authService.isAdminSession(adminSession)
+  const isAdmin = showTemplateRoleSwitch ? role === 'store' || role === 'owner' : adminRoute && isLoggedAdmin && (role === 'store' || role === 'owner')
   const brandName = storeSettings?.brandName || env.storeName
 
   useEffect(() => {
-    if (!showTemplateRoleSwitch && isLoggedAdmin && role !== adminSession.role) {
+    if (!showTemplateRoleSwitch && adminRoute && isLoggedAdmin && role !== adminSession.role) {
       setRole(adminSession.role)
       writeStorage(ROLE_STORAGE_KEY, adminSession.role)
       setPage('order')
     }
-    if (!showTemplateRoleSwitch && !isLoggedAdmin && role !== 'customer') {
+    if (!showTemplateRoleSwitch && !adminRoute && role !== 'customer') {
       setRole('customer')
       writeStorage(ROLE_STORAGE_KEY, 'customer')
       setPage('order')
     }
-  }, [showTemplateRoleSwitch, isLoggedAdmin, role, adminSession])
+    if (!showTemplateRoleSwitch && adminRoute && !isLoggedAdmin && role !== 'customer') {
+      setRole('customer')
+      writeStorage(ROLE_STORAGE_KEY, 'customer')
+      setPage('order')
+    }
+  }, [showTemplateRoleSwitch, adminRoute, isLoggedAdmin, role, adminSession])
 
   useEffect(() => {
     let mounted = true
@@ -142,7 +153,7 @@ function AppShell() {
   }
 
   function refreshRole() {
-    const nextRole = showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : authService.getSession()?.role || 'customer'
+    const nextRole = showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : adminRoute ? authService.getSession()?.role || 'customer' : 'customer'
     setRole(nextRole)
     if (!(nextRole === 'store' || nextRole === 'owner') && (page === 'products' || page === 'settings' || page === 'closing')) setPage('order')
   }
@@ -174,12 +185,11 @@ function AppShell() {
     }
     return [
       { value: 'order', label: '訂餐頁', icon: ShoppingBag },
-      { value: 'orders', label: '我的訂單', icon: ClipboardList },
-      ...(showTemplateRoleSwitch ? [] : [{ value: 'admin-login', label: '後台登入', icon: UserRound }])
+      { value: 'orders', label: '我的訂單', icon: ClipboardList }
     ]
-  }, [isAdmin, showTemplateRoleSwitch])
+  }, [isAdmin])
 
-  const CurrentPage = page === 'admin-login' && !isAdmin && !showTemplateRoleSwitch
+  const CurrentPage = adminRoute && !isAdmin && !showTemplateRoleSwitch
     ? AdminLoginPage
     : page === 'orders'
       ? OrderManagementPage
@@ -207,17 +217,19 @@ function AppShell() {
                 <option value="owner">老闆</option>
               </select>
             )}
-            <nav className="flex gap-2">
-              {navItems.map((item) => {
-                const Icon = item.icon
-                return (
-                  <button key={item.value} onClick={() => { refreshRole(); setPage(item.value) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
-                    <Icon size={18} /> {item.label}
-                  </button>
-                )
-              })}
-              {!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
-            </nav>
+            {!(adminRoute && !isAdmin && !showTemplateRoleSwitch) && (
+              <nav className="flex gap-2">
+                {navItems.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <button key={item.value} onClick={() => { refreshRole(); setPage(item.value) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
+                      <Icon size={18} /> {item.label}
+                    </button>
+                  )
+                })}
+                {!showTemplateRoleSwitch && adminRoute && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
+              </nav>
+            )}
           </div>
           <button className="rounded-2xl bg-white p-3 md:hidden" onClick={() => setOpen(!open)} type="button"><Menu size={20} /></button>
         </div>
@@ -233,7 +245,7 @@ function AppShell() {
                 </select>
               </label>
             )}
-            {navItems.map((item) => {
+            {!(adminRoute && !isAdmin && !showTemplateRoleSwitch) && navItems.map((item) => {
               const Icon = item.icon
               return (
                 <button key={item.value} onClick={() => { refreshRole(); setPage(item.value); setOpen(false) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
@@ -241,11 +253,11 @@ function AppShell() {
                 </button>
               )
             })}
-            {!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
+            {!showTemplateRoleSwitch && adminRoute && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
           </nav>
         )}
       </header>
-      <CurrentPage key={`${role}-${page}`} role={role} onRoleChange={refreshRole} onLogin={loginAdmin} adminSession={adminSession} />
+      <CurrentPage key={`${role}-${page}-${adminRoute ? 'admin' : 'public'}`} role={role} onRoleChange={refreshRole} onLogin={loginAdmin} adminSession={adminSession} />
     </div>
   )
 }
