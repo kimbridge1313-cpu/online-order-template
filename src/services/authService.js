@@ -1,7 +1,8 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import { env } from '../config/env'
 import { assertFirestoreReady } from '../config/firebase'
 import { readStorage, writeStorage } from '../utils/storage'
+import { liffService } from './liffService'
 
 export const ADMIN_SESSION_KEY = 'online-order-template-admin-session'
 export const ROLE_STORAGE_KEY = 'online-order-template-role'
@@ -25,6 +26,8 @@ function normalizeAdminUser(id, data = {}) {
     isActive: data.isActive !== false,
     password: data.password || '',
     passwordHash: data.passwordHash || '',
+    lineUserId: data.lineUserId || '',
+    lineDisplayName: data.lineDisplayName || '',
     createdAt: data.createdAt || '',
     updatedAt: data.updatedAt || '',
     lastLoginAt: data.lastLoginAt || ''
@@ -39,6 +42,8 @@ function cleanAdminPayload(user = {}) {
     storeName: user.role === 'owner' ? '' : user.storeName || '',
     displayName: user.displayName || user.username,
     isActive: user.isActive !== false,
+    lineUserId: user.lineUserId || '',
+    lineDisplayName: user.lineDisplayName || '',
     ...(user.password ? { password: user.password } : {}),
     updatedAt: new Date().toISOString()
   }))
@@ -66,6 +71,22 @@ async function loginWithMock({ username, password }) {
   return saveSession(user)
 }
 
+async function bindLineProfileToAdminUser(db, username, user) {
+  const profile = await liffService.getProfile({ requireLogin: false }).catch(() => null)
+  if (!profile?.userId) return user
+  const patch = {
+    lineUserId: profile.userId,
+    lineDisplayName: profile.displayName || '',
+    linePictureUrl: profile.pictureUrl || '',
+    lineBoundAt: new Date().toISOString(),
+    lineBoundAtServer: serverTimestamp(),
+    updatedAt: new Date().toISOString(),
+    updatedAtServer: serverTimestamp()
+  }
+  await setDoc(doc(db, ADMIN_USERS_COLLECTION, username), patch, { merge: true })
+  return { ...user, ...patch }
+}
+
 async function loginWithFirebase({ username, password }) {
   const db = assertFirestoreReady()
   const cleanUsername = String(username || '').trim()
@@ -80,6 +101,17 @@ async function loginWithFirebase({ username, password }) {
   if (!user.password || user.password !== password) throw new Error('帳號或密碼錯誤。')
 
   await setDoc(doc(db, ADMIN_USERS_COLLECTION, cleanUsername), { lastLoginAt: serverTimestamp() }, { merge: true })
+  const boundUser = await bindLineProfileToAdminUser(db, cleanUsername, user)
+  return saveSession(boundUser)
+}
+
+async function loginWithLineUserIdFirebase(lineUserId) {
+  if (!lineUserId) return null
+  const db = assertFirestoreReady()
+  const snapshot = await getDocs(query(collection(db, ADMIN_USERS_COLLECTION), where('lineUserId', '==', lineUserId)))
+  const user = snapshot.docs.map((item) => normalizeAdminUser(item.id, item.data())).find((item) => item.isActive)
+  if (!user) return null
+  await setDoc(doc(db, ADMIN_USERS_COLLECTION, user.username), { lastLineLoginAt: serverTimestamp() }, { merge: true })
   return saveSession(user)
 }
 
@@ -123,6 +155,13 @@ export const authService = {
 
   async login(credentials) {
     return env.useMockData ? loginWithMock(credentials) : loginWithFirebase(credentials)
+  },
+
+  async loginWithLineProfile() {
+    if (env.useMockData || !env.isLiffEnabled) return null
+    const profile = await liffService.getProfile({ requireLogin: false })
+    if (!profile?.userId) return null
+    return loginWithLineUserIdFirebase(profile.userId)
   },
 
   async listAdminUsers() {
