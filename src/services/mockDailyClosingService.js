@@ -118,5 +118,11 @@ export const mockDailyClosingService = {
     const next = [record, ...records.filter((item) => item.id !== record.id)]
     saveAll(next)
     return record
+  },
+
+  async deleteClosing(id) {
+    const next = list().filter((item) => item.id !== id)
+    saveAll(next)
+    return next
   }
 }
