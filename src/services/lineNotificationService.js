@@ -36,12 +36,12 @@ function getCustomerLineUserId(order) {
   return order.customer?.lineUserId || ''
 }
 
-async function pushLineMessage({ to, title, message }) {
-  if (!to) return { ok: false, skipped: true, reason: 'missing_line_user_id' }
+async function pushLineMessage({ target, to, title, message }) {
   const response = await fetch('/api/line/notify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      target,
       to,
       messages: [{ text: `${title}\n${message}` }]
     })
@@ -66,7 +66,7 @@ async function notify({ type, target, to, storeId = '', title, message }) {
   }
 
   try {
-    const result = await pushLineMessage({ to, title, message })
+    const result = await pushLineMessage({ target, to, title, message })
     return saveNotification({
       ...base,
       status: result.skipped ? 'skipped_missing_line_user_id' : 'sent',
