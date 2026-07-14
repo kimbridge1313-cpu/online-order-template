@@ -33,14 +33,11 @@ class AppErrorBoundary extends Component {
             <p className="text-xs font-bold text-red-600">系統啟動失敗</p>
             <h1 className="mt-2 text-2xl font-black">頁面載入時發生錯誤</h1>
             <p className="mt-3 text-sm text-muted">這通常是前端執行階段錯誤。請打開瀏覽器 Console 查看詳細訊息。</p>
-            <pre className="mt-4 overflow-auto rounded-2xl bg-red-50 p-4 text-xs text-red-800">
-              {this.state.error?.message || String(this.state.error)}
-            </pre>
+            <pre className="mt-4 overflow-auto rounded-2xl bg-red-50 p-4 text-xs text-red-800">{this.state.error?.message || String(this.state.error)}</pre>
           </div>
         </div>
       )
     }
-
     return this.props.children
   }
 }
@@ -58,16 +55,16 @@ function isInviteRoute() {
   return normalizedPathname() === '/admin/invite'
 }
 
-function BrandMark({ brandName, size = 'lg' }) {
-  const logoUrl = env.storeLogoUrl
+function BrandMark({ brandName, logoUrl = '', size = 'lg' }) {
+  const currentLogoUrl = logoUrl || env.storeLogoUrl
   const sizeClass = size === 'sm' ? 'h-10 w-10 rounded-2xl' : 'h-24 w-24 rounded-[2rem]'
   const textClass = size === 'sm' ? 'text-base' : 'text-3xl'
   const fallbackText = String(brandName || env.storeName || '店').trim().slice(0, 1)
 
   return (
     <div className={`${sizeClass} flex items-center justify-center overflow-hidden bg-white shadow-soft ring-1 ring-line`}>
-      {logoUrl ? (
-        <img className="h-full w-full object-contain p-3" src={logoUrl} alt={`${brandName || env.storeName} logo`} />
+      {currentLogoUrl ? (
+        <img className="h-full w-full object-contain p-3" src={currentLogoUrl} alt={`${brandName || env.storeName} logo`} />
       ) : (
         <span className={`${textClass} font-black text-brand`}>{fallbackText}</span>
       )}
@@ -75,11 +72,11 @@ function BrandMark({ brandName, size = 'lg' }) {
   )
 }
 
-function LoadingScreen({ brandName, message = '正在載入...' }) {
+function LoadingScreen({ brandName, logoUrl, message = '正在載入...' }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-cream px-6 text-ink">
       <div className="flex flex-col items-center text-center">
-        <BrandMark brandName={brandName} />
+        <BrandMark brandName={brandName} logoUrl={logoUrl} />
         <p className="mt-6 text-sm font-semibold text-accent">{brandName || env.storeName}</p>
         <h1 className="mt-1 text-2xl font-black">{env.appName}</h1>
         <p className="mt-3 text-sm font-semibold text-muted">{message}</p>
@@ -137,19 +134,8 @@ function AdminLoginPage({ onLogin }) {
         <p className="mt-5 text-xs font-semibold text-accent">Management</p>
         <h1 className="mt-1 text-3xl font-black">管理入口</h1>
         <p className="mt-3 text-sm leading-6 text-muted">門店可使用帳號密碼登入；已綁定 LINE 的管理員，也可以使用 LINE 授權或桌機掃碼登入。</p>
-
-        {env.isLiffEnabled && (
-          <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-black text-ink" type="button" onClick={loginWithLine} disabled={lineSubmitting}>
-            <QrCode size={18} /> {lineSubmitting ? '正在開啟 LINE...' : '使用 LINE / 掃碼登入'}
-          </button>
-        )}
-
-        <div className="my-5 flex items-center gap-3 text-xs font-bold text-muted">
-          <span className="h-px flex-1 bg-line" />
-          <span>或使用帳號密碼</span>
-          <span className="h-px flex-1 bg-line" />
-        </div>
-
+        {env.isLiffEnabled && <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-black text-ink" type="button" onClick={loginWithLine} disabled={lineSubmitting}><QrCode size={18} /> {lineSubmitting ? '正在開啟 LINE...' : '使用 LINE / 掃碼登入'}</button>}
+        <div className="my-5 flex items-center gap-3 text-xs font-bold text-muted"><span className="h-px flex-1 bg-line" /><span>或使用帳號密碼</span><span className="h-px flex-1 bg-line" /></div>
         <form onSubmit={submit}>
           <div className="space-y-3">
             <label className="block space-y-1"><span className="label">帳號</span><input className="input" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} autoComplete="username" required /></label>
@@ -171,13 +157,14 @@ function AppShell() {
   const [open, setOpen] = useState(false)
   const [role, setRole] = useState(() => showTemplateRoleSwitch ? readStorage(ROLE_STORAGE_KEY, 'customer') : authService.getSession()?.role || 'customer')
   const [adminSession, setAdminSession] = useState(() => authService.getSession())
-  const [storeSettings, setStoreSettings] = useState({ brandName: env.storeName })
+  const [storeSettings, setStoreSettings] = useState({ brandName: env.storeName, logoUrl: env.storeLogoUrl })
   const [lineChecking, setLineChecking] = useState(false)
   const isLoggedAdmin = authService.isAdminSession(adminSession)
   const isAdmin = showTemplateRoleSwitch ? role === 'store' || role === 'owner' : isLoggedAdmin && (role === 'store' || role === 'owner')
   const shouldShowInviteAccept = inviteRoute && !showTemplateRoleSwitch
   const shouldShowAdminLogin = adminRoute && !inviteRoute && !isAdmin && !showTemplateRoleSwitch
   const brandName = storeSettings?.brandName || env.storeName
+  const logoUrl = storeSettings?.logoUrl || env.storeLogoUrl
 
   useEffect(() => {
     if (!showTemplateRoleSwitch && isLoggedAdmin && role !== adminSession.role) {
@@ -303,7 +290,7 @@ function AppShell() {
               : OrderPage
 
   if (lineChecking) {
-    return <LoadingScreen brandName={brandName} message="正在確認 LINE 身份..." />
+    return <LoadingScreen brandName={brandName} logoUrl={logoUrl} message="正在確認 LINE 身份..." />
   }
 
   return (
@@ -311,59 +298,16 @@ function AppShell() {
       <header className="sticky top-0 z-40 border-b border-line bg-cream/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <BrandMark brandName={brandName} size="sm" />
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-accent">{brandName}</p>
-              <h1 className="truncate text-lg font-black text-ink">{env.appName}</h1>
-            </div>
+            <BrandMark brandName={brandName} logoUrl={logoUrl} size="sm" />
+            <div className="min-w-0"><p className="truncate text-xs font-semibold text-accent">{brandName}</p><h1 className="truncate text-lg font-black text-ink">{env.appName}</h1></div>
           </div>
           <div className="hidden items-center gap-2 md:flex">
-            {showTemplateRoleSwitch && (
-              <select className="rounded-2xl border border-line bg-white px-3 py-3 text-sm font-bold text-ink" value={role} onChange={(event) => switchRole(event.target.value)} aria-label="模板身份切換">
-                <option value="customer">顧客</option>
-                <option value="store">門店</option>
-                <option value="owner">老闆</option>
-              </select>
-            )}
-            {!shouldShowAdminLogin && !shouldShowInviteAccept && (
-              <nav className="flex gap-2">
-                {navItems.map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <button key={item.value} onClick={() => { refreshRole(); setPage(item.value) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
-                      <Icon size={18} /> {item.label}
-                    </button>
-                  )
-                })}
-                {!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
-              </nav>
-            )}
+            {showTemplateRoleSwitch && <select className="rounded-2xl border border-line bg-white px-3 py-3 text-sm font-bold text-ink" value={role} onChange={(event) => switchRole(event.target.value)} aria-label="模板身份切換"><option value="customer">顧客</option><option value="store">門店</option><option value="owner">老闆</option></select>}
+            {!shouldShowAdminLogin && !shouldShowInviteAccept && <nav className="flex gap-2">{navItems.map((item) => { const Icon = item.icon; return <button key={item.value} onClick={() => { refreshRole(); setPage(item.value) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button"><Icon size={18} /> {item.label}</button> })}{!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}</nav>}
           </div>
           <button className="rounded-2xl bg-white p-3 md:hidden" onClick={() => setOpen(!open)} type="button"><Menu size={20} /></button>
         </div>
-        {open && (
-          <nav className="grid gap-2 border-t border-line px-4 py-3 md:hidden">
-            {showTemplateRoleSwitch && (
-              <label className="space-y-1">
-                <span className="text-xs font-bold text-muted">模板身份</span>
-                <select className="input" value={role} onChange={(event) => switchRole(event.target.value)}>
-                  <option value="customer">顧客</option>
-                  <option value="store">門店</option>
-                  <option value="owner">老闆</option>
-                </select>
-              </label>
-            )}
-            {!shouldShowAdminLogin && !shouldShowInviteAccept && navItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <button key={item.value} onClick={() => { refreshRole(); setPage(item.value); setOpen(false) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button">
-                  <Icon size={18} /> {item.label}
-                </button>
-              )
-            })}
-            {!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}
-          </nav>
-        )}
+        {open && <nav className="grid gap-2 border-t border-line px-4 py-3 md:hidden">{showTemplateRoleSwitch && <label className="space-y-1"><span className="text-xs font-bold text-muted">模板身份</span><select className="input" value={role} onChange={(event) => switchRole(event.target.value)}><option value="customer">顧客</option><option value="store">門店</option><option value="owner">老闆</option></select></label>}{!shouldShowAdminLogin && !shouldShowInviteAccept && navItems.map((item) => { const Icon = item.icon; return <button key={item.value} onClick={() => { refreshRole(); setPage(item.value); setOpen(false) }} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${page === item.value ? 'bg-brand text-white' : 'bg-white text-muted'}`} type="button"><Icon size={18} /> {item.label}</button> })}{!showTemplateRoleSwitch && isLoggedAdmin && <button className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-muted" type="button" onClick={logoutAdmin}><LogOut size={18} /> 登出</button>}</nav>}
       </header>
       <CurrentPage key={`${role}-${page}-${isAdmin ? 'admin' : 'public'}-${shouldShowAdminLogin ? 'login' : shouldShowInviteAccept ? 'invite' : 'app'}`} role={role} onRoleChange={refreshRole} onLogin={loginAdmin} adminSession={adminSession} />
     </div>
@@ -371,9 +315,5 @@ function AppShell() {
 }
 
 export default function App() {
-  return (
-    <AppErrorBoundary>
-      <AppShell />
-    </AppErrorBoundary>
-  )
+  return <AppErrorBoundary><AppShell /></AppErrorBoundary>
 }
