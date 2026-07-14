@@ -62,9 +62,9 @@ function BrandMark({ brandName, logoUrl = '', size = 'lg' }) {
   const fallbackText = String(brandName || env.storeName || '店').trim().slice(0, 1)
 
   return (
-    <div className={`${sizeClass} flex items-center justify-center overflow-hidden bg-white ring-1 ring-line`}>
+    <div className={`${sizeClass} flex items-center justify-center overflow-hidden border border-line bg-white shadow-none ring-0`}>
       {currentLogoUrl ? (
-        <img className="h-full w-full object-cover" src={currentLogoUrl} alt={`${brandName || env.storeName} logo`} />
+        <img className="block h-full w-full object-cover shadow-none" src={currentLogoUrl} alt={`${brandName || env.storeName} logo`} />
       ) : (
         <span className={`${textClass} font-black text-brand`}>{fallbackText}</span>
       )}
