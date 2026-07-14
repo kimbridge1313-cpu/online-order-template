@@ -19,6 +19,10 @@ function defaultPaidAt(payload = {}, now = '') {
   return payload.source === 'counter' ? now : ''
 }
 
+function shouldNotifyLine(order) {
+  return order?.source === 'customer_online'
+}
+
 export const firebaseOrderService = {
   async listOrders() {
     const db = assertFirestoreReady()
@@ -43,7 +47,7 @@ export const firebaseOrderService = {
       updatedAt: now
     })
     await setDoc(doc(db, COLLECTION, id), order)
-    await lineNotificationService.notifyNewOrder(order)
+    if (shouldNotifyLine(order)) await lineNotificationService.notifyNewOrder(order)
     return order
   },
 
@@ -60,7 +64,7 @@ export const firebaseOrderService = {
       status: 'accepted',
       acceptedAt: new Date().toISOString()
     })
-    if (order && order.source === 'customer_online') await lineNotificationService.notifyAcceptedOrder(order)
+    if (shouldNotifyLine(order)) await lineNotificationService.notifyAcceptedOrder(order)
     return order
   },
 
@@ -89,7 +93,7 @@ export const firebaseOrderService = {
       cancelReason,
       cancelledAt: new Date().toISOString()
     })
-    if (order) await lineNotificationService.notifyCancelledOrder(order)
+    if (shouldNotifyLine(order)) await lineNotificationService.notifyCancelledOrder(order)
     return order
   }
 }
