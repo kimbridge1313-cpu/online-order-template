@@ -64,7 +64,7 @@ function BrandMark({ brandName, logoUrl = '', size = 'lg' }) {
   return (
     <div className={`${sizeClass} flex items-center justify-center overflow-hidden bg-white shadow-soft ring-1 ring-line`}>
       {currentLogoUrl ? (
-        <img className="h-full w-full object-contain p-3" src={currentLogoUrl} alt={`${brandName || env.storeName} logo`} />
+        <img className="h-full w-full object-cover" src={currentLogoUrl} alt={`${brandName || env.storeName} logo`} />
       ) : (
         <span className={`${textClass} font-black text-brand`}>{fallbackText}</span>
       )}
@@ -159,12 +159,18 @@ function AppShell() {
   const [adminSession, setAdminSession] = useState(() => authService.getSession())
   const [storeSettings, setStoreSettings] = useState({ brandName: env.storeName, logoUrl: env.storeLogoUrl })
   const [lineChecking, setLineChecking] = useState(false)
+  const [loadingGateOpen, setLoadingGateOpen] = useState(false)
   const isLoggedAdmin = authService.isAdminSession(adminSession)
   const isAdmin = showTemplateRoleSwitch ? role === 'store' || role === 'owner' : isLoggedAdmin && (role === 'store' || role === 'owner')
   const shouldShowInviteAccept = inviteRoute && !showTemplateRoleSwitch
   const shouldShowAdminLogin = adminRoute && !inviteRoute && !isAdmin && !showTemplateRoleSwitch
   const brandName = storeSettings?.brandName || env.storeName
   const logoUrl = storeSettings?.logoUrl || env.storeLogoUrl
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setLoadingGateOpen(true), 3000)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (!showTemplateRoleSwitch && isLoggedAdmin && role !== adminSession.role) {
@@ -289,8 +295,8 @@ function AppShell() {
               ? StoreSettingsPage
               : OrderPage
 
-  if (lineChecking) {
-    return <LoadingScreen brandName={brandName} logoUrl={logoUrl} message="正在確認 LINE 身份..." />
+  if (!loadingGateOpen || lineChecking) {
+    return <LoadingScreen brandName={brandName} logoUrl={logoUrl} message={lineChecking ? '正在確認 LINE 身份...' : '正在載入...'} />
   }
 
   return (
