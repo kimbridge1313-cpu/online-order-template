@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, ChevronDown, MapPin, MessageCircle, ShoppingBag, UserRound } from 'lucide-react'
+import { CheckCircle2, ChevronDown, MapPin, ShoppingBag, UserRound } from 'lucide-react'
 import ProductCard from '../components/ProductCard'
 import ProductOptionModal from '../components/ProductOptionModal'
 import CartPanel from '../components/CartPanel'
@@ -8,7 +8,6 @@ import { productService } from '../services/productService'
 import { orderService } from '../services/orderService'
 import { defaultStoreSettings, defaultStores, normalizeStoreSettings, storeConfigService } from '../services/storeConfigService'
 import { calculateCartTotal, formatPrice } from '../utils/price'
-import { env } from '../config/env'
 import { readStorage, writeStorage } from '../utils/storage'
 
 const CUSTOMER_PROFILE_KEY = 'online-order-template-customer-profile'
@@ -36,8 +35,8 @@ function getDistanceKm(a, b) {
 }
 
 export default function OrderPage() {
-  const [role, setRole] = useState(() => readStorage(MOCK_ROLE_KEY, 'customer'))
-  const [isLineLoggedIn, setIsLineLoggedIn] = useState(() => readStorage(MOCK_LINE_LOGIN_KEY, false))
+  const [role] = useState(() => readStorage(MOCK_ROLE_KEY, 'customer'))
+  const [isLineLoggedIn] = useState(() => readStorage(MOCK_LINE_LOGIN_KEY, false))
   const [profile, setProfile] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
   const [profileDraft, setProfileDraft] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
   const [storeSettings, setStoreSettings] = useState(() => normalizeStoreSettings(defaultStoreSettings))
@@ -143,21 +142,6 @@ export default function OrderPage() {
   const categories = useMemo(() => ['全部', ...Array.from(new Set(products.map((p) => p.category)))], [products])
   const visibleProducts = products.filter((product) => category === '全部' || product.category === category)
 
-  function updateRole(nextRole) {
-    setRole(nextRole)
-    writeStorage(MOCK_ROLE_KEY, nextRole)
-    if (nextRole === 'store' || nextRole === 'owner') {
-      setIsLineLoggedIn(true)
-      writeStorage(MOCK_LINE_LOGIN_KEY, true)
-      setCheckoutStep('ordering')
-    }
-  }
-
-  function mockLineLogin() {
-    setIsLineLoggedIn(true)
-    writeStorage(MOCK_LINE_LOGIN_KEY, true)
-  }
-
   function saveProfile(event) {
     event.preventDefault()
     if (!profileDraft.name || !profileDraft.phone) return setMessage('請填寫姓名與電話。')
@@ -189,6 +173,15 @@ export default function OrderPage() {
     return `${orderDate}T${orderTime}`
   }
 
+  function renderLineWarning(extraClassName = '') {
+    if (isStore || isLineLoggedIn) return null
+    return (
+      <p className={`rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-semibold leading-6 text-red-700 ${extraClassName}`}>
+        未登入 LINE 仍可點餐，但將無法收到店家接單、取消等訂單狀態通知。
+      </p>
+    )
+  }
+
   async function submitOrder() {
     setMessage('')
     if (cartItems.length === 0) return setMessage('請先加入商品。')
@@ -200,10 +193,16 @@ export default function OrderPage() {
     if (timeType === 'scheduled' && !getScheduledTime()) return setMessage('請選擇預定日期與時間。')
     if (timeType === 'scheduled' && orderDate < minScheduledDate) return setMessage(`預定日期至少需提前 ${timeSettings.preorderMinDays || 0} 天。`)
 
+    const customerLineUserId = !isStore && isLineLoggedIn ? 'mock-line-user-id' : ''
     const order = await orderService.createOrder({
       source,
       store: selectedStore ? { id: selectedStore.id, name: selectedStore.name } : null,
-      customer: { name: isStore ? '門店櫃檯' : profile.name, phone: isStore ? '' : profile.phone, lineUserId: isStore ? '' : 'mock-line-user-id', lineDisplayName: isStore ? '' : profile.name },
+      customer: {
+        name: isStore ? '門店櫃檯' : profile.name,
+        phone: isStore ? '' : profile.phone,
+        lineUserId: customerLineUserId,
+        lineDisplayName: customerLineUserId ? profile.name : ''
+      },
       diningType,
       deliveryAddress: diningType === 'delivery' ? deliveryAddress.trim() : '',
       deliveryDistanceKm: diningType === 'delivery' && selectedStoreDistanceKm !== null ? Number(selectedStoreDistanceKm.toFixed(1)) : null,
@@ -307,22 +306,7 @@ export default function OrderPage() {
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-brand" size={18} />
         </div>
         {selectedStore && <p className="mt-1.5 text-[11px] leading-4 text-muted">{selectedStore.name}{storeLocationMessage ? `｜${storeLocationMessage}` : ''}</p>}
-      </div>
-    )
-  }
-
-  if (!isStore && !isLineLoggedIn) {
-    return (
-      <div className="mx-auto max-w-xl px-4 py-10">
-        <section className="card border-accent/30 bg-green-50/80 p-7 text-center">
-          <MessageCircle className="mx-auto text-accent" size={52} />
-          <h1 className="mt-4 text-3xl font-black">請先加入 LINE 官方帳號</h1>
-          <p className="mt-3 text-sm leading-6 text-muted">為了接收訂單通知與聯絡訂單內容，請先加入店家的 LINE 官方帳號，再開始點餐。</p>
-          <a className={`btn-primary mt-6 inline-block ${!env.lineOfficialAccountUrl ? 'pointer-events-none opacity-40' : ''}`} href={env.lineOfficialAccountUrl || '#'} target="_blank" rel="noreferrer">加入 LINE 官方帳號</a>
-          <button className="btn-secondary mt-3 w-full" type="button" onClick={mockLineLogin}>模板測試：模擬已登入 LINE</button>
-          <button className="mt-4 text-xs font-semibold text-muted underline" type="button" onClick={() => updateRole('store')}>模板測試：切換為門店帳號</button>
-          <button className="mt-3 text-xs font-semibold text-muted underline" type="button" onClick={() => updateRole('owner')}>模板測試：切換為老闆帳號</button>
-        </section>
+        {renderLineWarning('mt-2 px-3 py-2 text-[11px] leading-4')}
       </div>
     )
   }
@@ -334,6 +318,7 @@ export default function OrderPage() {
           <UserRound className="text-accent" size={36} />
           <h1 className="mt-3 text-3xl font-black">建立訂餐資料</h1>
           <p className="mt-2 text-sm leading-6 text-muted">初次訂餐請填寫姓名與電話。資料僅限訂單聯絡使用。</p>
+          {renderLineWarning('mt-4')}
           <div className="mt-5 space-y-3">
             <label className="block space-y-1"><span className="label">姓名 *</span><input className="input" value={profileDraft.name} onChange={(event) => setProfileDraft({ ...profileDraft, name: event.target.value })} required /></label>
             <label className="block space-y-1"><span className="label">電話 *</span><input className="input" value={profileDraft.phone} onChange={(event) => setProfileDraft({ ...profileDraft, phone: event.target.value })} required inputMode="tel" /></label>
@@ -353,6 +338,7 @@ export default function OrderPage() {
           <h1 className="mt-4 text-3xl font-black">訂餐成功</h1>
           <p className="mt-2 text-muted">訂單編號：{successOrder.orderNumber}</p>
           <p className="mt-4 text-4xl font-black text-brand">{formatPrice(successOrder.totalAmount)}</p>
+          {!isLineLoggedIn && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold leading-6 text-red-700">你尚未登入 LINE，本次訂單不會收到接單或取消等狀態通知。請留意電話聯絡。</p>}
           <button className="btn-primary mt-6" type="button" onClick={() => setSuccessOrder(null)}>建立下一筆訂單</button>
         </div>
       </div>
@@ -367,6 +353,7 @@ export default function OrderPage() {
             <p className="text-xs font-semibold text-accent">Checkout</p>
             <h1 className="mt-1 text-3xl font-black">確認訂單</h1>
             <p className="mt-2 text-sm text-muted">確認門店、用餐方式、用餐 / 取餐 / 外送時間與訂單聯絡資料。</p>
+            {renderLineWarning('mt-4')}
           </section>
           {renderOrderOptionsPanel()}
           <section className="card p-5">
