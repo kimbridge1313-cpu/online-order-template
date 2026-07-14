@@ -18,7 +18,9 @@ function normalizeMessages(messages = []) {
 
 function resolveTarget(body = {}) {
   if (body.to) return body.to
-  if (body.target === 'store') return process.env.LINE_STORE_NOTIFY_USER_ID || ''
+  if (body.target === 'store') {
+    return process.env.LINE_STORE_NOTIFY_TO || process.env.LINE_STORE_NOTIFY_USER_ID || ''
+  }
   return ''
 }
 
@@ -33,7 +35,7 @@ export default async function handler(req, res) {
     const to = resolveTarget(body)
     const messages = normalizeMessages(body.messages)
 
-    if (!to) return json(res, 200, { ok: true, skipped: true, reason: 'missing_line_user_id' })
+    if (!to) return json(res, 200, { ok: true, skipped: true, reason: 'missing_line_notify_target' })
     if (messages.length === 0) return json(res, 400, { ok: false, error: 'missing_messages' })
 
     const lineResponse = await fetch(LINE_PUSH_API, {
