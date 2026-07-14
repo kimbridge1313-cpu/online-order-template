@@ -58,6 +58,41 @@ function isInviteRoute() {
   return normalizedPathname() === '/admin/invite'
 }
 
+function BrandMark({ brandName, size = 'lg' }) {
+  const logoUrl = env.storeLogoUrl
+  const sizeClass = size === 'sm' ? 'h-10 w-10 rounded-2xl' : 'h-24 w-24 rounded-[2rem]'
+  const textClass = size === 'sm' ? 'text-base' : 'text-3xl'
+  const fallbackText = String(brandName || env.storeName || '店').trim().slice(0, 1)
+
+  return (
+    <div className={`${sizeClass} flex items-center justify-center overflow-hidden bg-white shadow-soft ring-1 ring-line`}>
+      {logoUrl ? (
+        <img className="h-full w-full object-contain p-3" src={logoUrl} alt={`${brandName || env.storeName} logo`} />
+      ) : (
+        <span className={`${textClass} font-black text-brand`}>{fallbackText}</span>
+      )}
+    </div>
+  )
+}
+
+function LoadingScreen({ brandName, message = '正在載入...' }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-cream px-6 text-ink">
+      <div className="flex flex-col items-center text-center">
+        <BrandMark brandName={brandName} />
+        <p className="mt-6 text-sm font-semibold text-accent">{brandName || env.storeName}</p>
+        <h1 className="mt-1 text-2xl font-black">{env.appName}</h1>
+        <p className="mt-3 text-sm font-semibold text-muted">{message}</p>
+        <div className="mt-6 flex gap-1.5" aria-hidden="true">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-brand" />
+          <span className="h-2 w-2 animate-pulse rounded-full bg-brand [animation-delay:150ms]" />
+          <span className="h-2 w-2 animate-pulse rounded-full bg-brand [animation-delay:300ms]" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AdminLoginPage({ onLogin }) {
   const [form, setForm] = useState({ username: '', password: '' })
   const [message, setMessage] = useState('')
@@ -267,14 +302,20 @@ function AppShell() {
               ? StoreSettingsPage
               : OrderPage
 
+  if (lineChecking) {
+    return <LoadingScreen brandName={brandName} message="正在確認 LINE 身份..." />
+  }
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-line bg-cream/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
-          <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-accent">{brandName}</p>
-            <h1 className="truncate text-lg font-black text-ink">{env.appName}</h1>
-            {lineChecking && <p className="mt-1 text-[11px] font-semibold text-muted">正在確認 LINE 身份...</p>}
+          <div className="flex min-w-0 items-center gap-3">
+            <BrandMark brandName={brandName} size="sm" />
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-accent">{brandName}</p>
+              <h1 className="truncate text-lg font-black text-ink">{env.appName}</h1>
+            </div>
           </div>
           <div className="hidden items-center gap-2 md:flex">
             {showTemplateRoleSwitch && (
