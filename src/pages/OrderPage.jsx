@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, ChevronDown, MapPin, ShoppingBag, UserRound } from 'lucide-react'
+import { CheckCircle2, ChevronDown, MapPin, MessageCircle, ShoppingBag, UserRound } from 'lucide-react'
 import ProductCard from '../components/ProductCard'
 import ProductOptionModal from '../components/ProductOptionModal'
 import CartPanel from '../components/CartPanel'
@@ -8,6 +8,7 @@ import { productService } from '../services/productService'
 import { orderService } from '../services/orderService'
 import { defaultStoreSettings, defaultStores, normalizeStoreSettings, storeConfigService } from '../services/storeConfigService'
 import { calculateCartTotal, formatPrice } from '../utils/price'
+import { env } from '../config/env'
 import { readStorage, writeStorage } from '../utils/storage'
 
 const CUSTOMER_PROFILE_KEY = 'online-order-template-customer-profile'
@@ -37,6 +38,8 @@ function getDistanceKm(a, b) {
 export default function OrderPage() {
   const [role] = useState(() => readStorage(MOCK_ROLE_KEY, 'customer'))
   const [isLineLoggedIn] = useState(() => readStorage(MOCK_LINE_LOGIN_KEY, false))
+  const [allowNoLineOrder, setAllowNoLineOrder] = useState(false)
+  const [noLineExpanded, setNoLineExpanded] = useState(false)
   const [profile, setProfile] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
   const [profileDraft, setProfileDraft] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
   const [storeSettings, setStoreSettings] = useState(() => normalizeStoreSettings(defaultStoreSettings))
@@ -177,8 +180,36 @@ export default function OrderPage() {
     if (isStore || isLineLoggedIn) return null
     return (
       <p className={`rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-semibold leading-6 text-red-700 ${extraClassName}`}>
-        未登入 LINE 仍可點餐，但將無法收到店家接單、取消等訂單狀態通知。
+        未使用 LINE 點餐，將無法收到店家接單、取消等訂單狀態通知。請務必留下可聯絡電話。
       </p>
+    )
+  }
+
+  function renderLineEntry() {
+    if (isStore || isLineLoggedIn || allowNoLineOrder || hasProfile) return null
+    return (
+      <div className="mx-auto max-w-xl px-4 py-10">
+        <section className="card border-accent/30 bg-green-50/80 p-7 text-center">
+          <MessageCircle className="mx-auto text-accent" size={52} />
+          <h1 className="mt-4 text-3xl font-black">使用 LINE 開始點餐</h1>
+          <p className="mt-3 text-sm leading-6 text-muted">建議使用 LINE 點餐，才能收到店家接單、取消與訂單狀態通知。</p>
+          <a className={`btn-primary mt-6 inline-block ${!env.lineOfficialAccountUrl ? 'pointer-events-none opacity-40' : ''}`} href={env.lineOfficialAccountUrl || '#'} target="_blank" rel="noreferrer">加入 LINE 官方帳號</a>
+          <p className="mt-3 text-xs leading-5 text-muted">加入後請回到此頁繼續點餐。</p>
+        </section>
+
+        <section className="mt-4 rounded-3xl border border-line bg-white/80 p-4">
+          <button className="flex w-full items-center justify-between text-left text-sm font-black text-muted" type="button" onClick={() => setNoLineExpanded(!noLineExpanded)}>
+            <span>沒有 LINE，也可以繼續點餐</span>
+            <ChevronDown className={`transition ${noLineExpanded ? 'rotate-180' : ''}`} size={18} />
+          </button>
+          {noLineExpanded && (
+            <div className="mt-4 space-y-3">
+              {renderLineWarning()}
+              <button className="btn-secondary w-full" type="button" onClick={() => setAllowNoLineOrder(true)}>我了解，仍要繼續點餐</button>
+            </div>
+          )}
+        </section>
+      </div>
     )
   }
 
@@ -306,10 +337,12 @@ export default function OrderPage() {
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-brand" size={18} />
         </div>
         {selectedStore && <p className="mt-1.5 text-[11px] leading-4 text-muted">{selectedStore.name}{storeLocationMessage ? `｜${storeLocationMessage}` : ''}</p>}
-        {renderLineWarning('mt-2 px-3 py-2 text-[11px] leading-4')}
       </div>
     )
   }
+
+  const lineEntry = renderLineEntry()
+  if (lineEntry) return lineEntry
 
   if (!isStore && !hasProfile) {
     return (
@@ -318,7 +351,7 @@ export default function OrderPage() {
           <UserRound className="text-accent" size={36} />
           <h1 className="mt-3 text-3xl font-black">建立訂餐資料</h1>
           <p className="mt-2 text-sm leading-6 text-muted">初次訂餐請填寫姓名與電話。資料僅限訂單聯絡使用。</p>
-          {renderLineWarning('mt-4')}
+          {allowNoLineOrder && renderLineWarning('mt-4')}
           <div className="mt-5 space-y-3">
             <label className="block space-y-1"><span className="label">姓名 *</span><input className="input" value={profileDraft.name} onChange={(event) => setProfileDraft({ ...profileDraft, name: event.target.value })} required /></label>
             <label className="block space-y-1"><span className="label">電話 *</span><input className="input" value={profileDraft.phone} onChange={(event) => setProfileDraft({ ...profileDraft, phone: event.target.value })} required inputMode="tel" /></label>
@@ -338,7 +371,7 @@ export default function OrderPage() {
           <h1 className="mt-4 text-3xl font-black">訂餐成功</h1>
           <p className="mt-2 text-muted">訂單編號：{successOrder.orderNumber}</p>
           <p className="mt-4 text-4xl font-black text-brand">{formatPrice(successOrder.totalAmount)}</p>
-          {!isLineLoggedIn && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold leading-6 text-red-700">你尚未登入 LINE，本次訂單不會收到接單或取消等狀態通知。請留意電話聯絡。</p>}
+          {!isLineLoggedIn && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold leading-6 text-red-700">你尚未使用 LINE 點餐，本次訂單不會收到接單或取消等狀態通知。請留意電話聯絡。</p>}
           <button className="btn-primary mt-6" type="button" onClick={() => setSuccessOrder(null)}>建立下一筆訂單</button>
         </div>
       </div>
@@ -353,7 +386,7 @@ export default function OrderPage() {
             <p className="text-xs font-semibold text-accent">Checkout</p>
             <h1 className="mt-1 text-3xl font-black">確認訂單</h1>
             <p className="mt-2 text-sm text-muted">確認門店、用餐方式、用餐 / 取餐 / 外送時間與訂單聯絡資料。</p>
-            {renderLineWarning('mt-4')}
+            {allowNoLineOrder && renderLineWarning('mt-4')}
           </section>
           {renderOrderOptionsPanel()}
           <section className="card p-5">
