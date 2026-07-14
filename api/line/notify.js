@@ -16,6 +16,12 @@ function normalizeMessages(messages = []) {
     }))
 }
 
+function resolveTarget(body = {}) {
+  if (body.to) return body.to
+  if (body.target === 'store') return process.env.LINE_STORE_NOTIFY_USER_ID || ''
+  return ''
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'method_not_allowed' })
 
@@ -24,10 +30,10 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
-    const to = body.to
+    const to = resolveTarget(body)
     const messages = normalizeMessages(body.messages)
 
-    if (!to) return json(res, 400, { ok: false, error: 'missing_to' })
+    if (!to) return json(res, 200, { ok: true, skipped: true, reason: 'missing_line_user_id' })
     if (messages.length === 0) return json(res, 400, { ok: false, error: 'missing_messages' })
 
     const lineResponse = await fetch(LINE_PUSH_API, {
