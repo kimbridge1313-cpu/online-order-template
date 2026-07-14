@@ -22,6 +22,10 @@ function defaultPaidAt(payload = {}, now = '') {
   return payload.source === 'counter' ? now : ''
 }
 
+function shouldNotifyLine(order) {
+  return order?.source === 'customer_online'
+}
+
 export const mockOrderService = {
   async listOrders() {
     return list().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -42,7 +46,7 @@ export const mockOrderService = {
     }
     const next = [order, ...list()]
     saveAll(next)
-    await lineNotificationService.notifyNewOrder(order)
+    if (shouldNotifyLine(order)) await lineNotificationService.notifyNewOrder(order)
     return order
   },
   async updateOrder(orderId, patch) {
@@ -57,7 +61,7 @@ export const mockOrderService = {
       status: 'accepted',
       acceptedAt: new Date().toISOString()
     })
-    if (order && order.source === 'customer_online') await lineNotificationService.notifyAcceptedOrder(order)
+    if (shouldNotifyLine(order)) await lineNotificationService.notifyAcceptedOrder(order)
     return order
   },
   async markOrderPaid(orderId, { paymentMethod = 'cash', paidBy = '' } = {}) {
@@ -83,7 +87,7 @@ export const mockOrderService = {
       cancelReason,
       cancelledAt: new Date().toISOString()
     })
-    if (order) await lineNotificationService.notifyCancelledOrder(order)
+    if (shouldNotifyLine(order)) await lineNotificationService.notifyCancelledOrder(order)
     return order
   }
 }
