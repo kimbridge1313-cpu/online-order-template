@@ -62,7 +62,7 @@ function BrandMark({ brandName, logoUrl = '', size = 'lg' }) {
   const fallbackText = String(brandName || env.storeName || '店').trim().slice(0, 1)
 
   return (
-    <div className={`${sizeClass} flex items-center justify-center overflow-hidden bg-white shadow-soft ring-1 ring-line`}>
+    <div className={`${sizeClass} flex items-center justify-center overflow-hidden bg-white ring-1 ring-line`}>
       {currentLogoUrl ? (
         <img className="h-full w-full object-cover" src={currentLogoUrl} alt={`${brandName || env.storeName} logo`} />
       ) : (
@@ -134,7 +134,11 @@ function AdminLoginPage({ onLogin }) {
         <p className="mt-5 text-xs font-semibold text-accent">Management</p>
         <h1 className="mt-1 text-3xl font-black">管理入口</h1>
         <p className="mt-3 text-sm leading-6 text-muted">門店可使用帳號密碼登入；已綁定 LINE 的管理員，也可以使用 LINE 授權或桌機掃碼登入。</p>
-        {env.isLiffEnabled && <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-black text-ink" type="button" onClick={loginWithLine} disabled={lineSubmitting}><QrCode size={18} /> {lineSubmitting ? '正在開啟 LINE...' : '使用 LINE / 掃碼登入'}</button>}
+        {env.isLiffEnabled && (
+          <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-black text-ink" type="button" onClick={loginWithLine} disabled={lineSubmitting}>
+            <QrCode size={18} /> {lineSubmitting ? '正在開啟 LINE...' : '使用 LINE / 掃碼登入'}
+          </button>
+        )}
         <div className="my-5 flex items-center gap-3 text-xs font-bold text-muted"><span className="h-px flex-1 bg-line" /><span>或使用帳號密碼</span><span className="h-px flex-1 bg-line" /></div>
         <form onSubmit={submit}>
           <div className="space-y-3">
