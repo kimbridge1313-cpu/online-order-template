@@ -16,6 +16,9 @@ const defaultTimeSettings = { immediateEnabled: true, scheduledEnabled: true, pr
 
 export const defaultStoreSettings = {
   brandName: '示範店家',
+  logoUrl: '',
+  logoPublicId: '',
+  logoMeta: null,
   tableNumberEnabled: false,
   tableNumbers: [],
   diningModules: defaultDiningModules,
@@ -31,6 +34,9 @@ export function normalizeStoreSettings(rawSettings = {}) {
   return {
     ...defaultStoreSettings,
     ...rawSettings,
+    logoUrl: rawSettings.logoUrl || env.storeLogoUrl || '',
+    logoPublicId: rawSettings.logoPublicId || '',
+    logoMeta: rawSettings.logoMeta || null,
     diningModules: {
       ...defaultDiningModules,
       ...(rawSettings.diningModules || {})
