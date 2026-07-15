@@ -17,6 +17,7 @@ export default function ProductOptionModal({ product, onClose, onAdd }) {
   const selectedOptions = flattenSelectedOptions(product, selections)
   const unitPrice = calculateUnitPrice(product, selectedOptions)
   const subtotal = unitPrice * quantity
+  const description = String(product.description || '').trim()
 
   function selectSingle(groupId, optionId) {
     setSelections({ ...selections, [groupId]: optionId })
@@ -63,6 +64,13 @@ export default function ProductOptionModal({ product, onClose, onAdd }) {
           <div className="mt-4 overflow-hidden rounded-3xl border border-line bg-white">
             <img className="max-h-72 w-full object-cover" src={product.imageUrl} alt={product.name} loading="lazy" />
           </div>
+        )}
+
+        {description && (
+          <section className="mt-4 rounded-3xl border border-line bg-white p-4">
+            <h3 className="text-sm font-black text-ink">商品描述</h3>
+            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-muted">{description}</p>
+          </section>
         )}
 
         <div className="mt-5 space-y-5">
