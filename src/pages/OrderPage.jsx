@@ -7,6 +7,7 @@ import DiningTypeSelector, { allDiningTypes } from '../components/DiningTypeSele
 import { productService } from '../services/productService'
 import { orderService } from '../services/orderService'
 import { defaultStoreSettings, defaultStores, normalizeStoreSettings, storeConfigService } from '../services/storeConfigService'
+import { PRODUCT_STORE_STATUS, getStoreStatusDate, storeProductStatusService } from '../services/storeProductStatusService'
 import { calculateCartTotal, formatPrice } from '../utils/price'
 import { env } from '../config/env'
 import { readStorage, writeStorage } from '../utils/storage'
@@ -35,8 +36,8 @@ function getDistanceKm(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
 }
 
-export default function OrderPage() {
-  const [role] = useState(() => readStorage(MOCK_ROLE_KEY, 'customer'))
+export default function OrderPage({ role: roleProp, adminSession }) {
+  const [role] = useState(() => roleProp || readStorage(MOCK_ROLE_KEY, 'customer'))
   const [isLineLoggedIn] = useState(() => readStorage(MOCK_LINE_LOGIN_KEY, false))
   const [allowNoLineOrder, setAllowNoLineOrder] = useState(false)
   const [noLineExpanded, setNoLineExpanded] = useState(false)
@@ -44,10 +45,11 @@ export default function OrderPage() {
   const [profileDraft, setProfileDraft] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
   const [storeSettings, setStoreSettings] = useState(() => normalizeStoreSettings(defaultStoreSettings))
   const [stores, setStores] = useState(defaultStores)
-  const [selectedStoreId, setSelectedStoreId] = useState(defaultStores[0]?.id || '')
+  const [selectedStoreId, setSelectedStoreId] = useState(adminSession?.storeId || defaultStores[0]?.id || '')
   const [userLocation, setUserLocation] = useState(null)
   const [storeLocationMessage, setStoreLocationMessage] = useState('')
   const [products, setProducts] = useState([])
+  const [storeProductStatuses, setStoreProductStatuses] = useState({})
   const [category, setCategory] = useState('全部')
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [cartItems, setCartItems] = useState([])
@@ -64,6 +66,7 @@ export default function OrderPage() {
   const [successOrder, setSuccessOrder] = useState(null)
 
   const isStore = role === 'store' || role === 'owner'
+  const isOwner = role === 'owner'
   const activeStores = stores.filter((store) => store.isActive !== false)
   const hasProfile = isStore || Boolean(profile?.name && profile?.phone)
   const source = isStore ? 'counter' : 'customer_online'
@@ -96,16 +99,34 @@ export default function OrderPage() {
       const normalized = normalizeStoreSettings(settingsData)
       const nextStores = storeData.length ? storeData : defaultStores
       const enabledStores = nextStores.filter((store) => store.isActive !== false)
+      const preferredStoreId = role === 'store' && adminSession?.storeId ? adminSession.storeId : selectedStoreId
       setStoreSettings(normalized)
       setStores(nextStores)
       setProducts(productData.filter((product) => product.isAvailable))
-      setSelectedStoreId((current) => enabledStores.some((store) => store.id === current) ? current : (enabledStores[0]?.id || ''))
+      setSelectedStoreId((current) => enabledStores.some((store) => store.id === preferredStoreId) ? preferredStoreId : (enabledStores.some((store) => store.id === current) ? current : (enabledStores[0]?.id || '')))
       if (normalized.timeSettings?.immediateEnabled === false) setTimeType('scheduled')
       setOrderDate(getDateAfter(normalized.timeSettings?.preorderMinDays || 0))
     }
     loadConfig()
     return () => { mounted = false }
   }, [])
+
+  useEffect(() => {
+    let mounted = true
+    async function loadStoreProductStatuses() {
+      if (!selectedStoreId) {
+        setStoreProductStatuses({})
+        return
+      }
+      const statuses = await storeProductStatusService.listStoreProductStatuses({
+        storeId: selectedStoreId,
+        date: getStoreStatusDate()
+      })
+      if (mounted) setStoreProductStatuses(statuses)
+    }
+    loadStoreProductStatuses()
+    return () => { mounted = false }
+  }, [selectedStoreId])
 
   useEffect(() => {
     if (!activeDiningOptions.some((item) => item.value === diningType)) setDiningType(activeDiningOptions[0]?.value || 'dine_in')
@@ -142,8 +163,21 @@ export default function OrderPage() {
     )
   }, [isStore, activeStores.length])
 
-  const categories = useMemo(() => ['全部', ...Array.from(new Set(products.map((p) => p.category)))], [products])
-  const visibleProducts = products.filter((product) => category === '全部' || product.category === category)
+  const storeVisibleProducts = useMemo(() => {
+    return products
+      .map((product) => {
+        const storeStatus = storeProductStatuses[product.id] || PRODUCT_STORE_STATUS.HIDDEN
+        return {
+          ...product,
+          storeStatus,
+          isSoldOut: storeStatus === PRODUCT_STORE_STATUS.SOLD_OUT
+        }
+      })
+      .filter((product) => product.storeStatus === PRODUCT_STORE_STATUS.AVAILABLE || product.storeStatus === PRODUCT_STORE_STATUS.SOLD_OUT)
+  }, [products, storeProductStatuses])
+
+  const categories = useMemo(() => ['全部', ...Array.from(new Set(storeVisibleProducts.map((p) => p.category)))], [storeVisibleProducts])
+  const visibleProducts = storeVisibleProducts.filter((product) => category === '全部' || product.category === category)
 
   function saveProfile(event) {
     event.preventDefault()
@@ -154,6 +188,11 @@ export default function OrderPage() {
   }
 
   function addToCart(item) {
+    if (storeProductStatuses[item.productId] !== PRODUCT_STORE_STATUS.AVAILABLE) {
+      setMessage('此商品目前未上架或已售完。')
+      setSelectedProduct(null)
+      return
+    }
     setCartItems([...cartItems, item])
     setSelectedProduct(null)
   }
@@ -165,6 +204,8 @@ export default function OrderPage() {
   function goCheckout() {
     setMessage('')
     if (cartItems.length === 0) return setMessage('請先加入商品。')
+    const unavailableItem = cartItems.find((item) => storeProductStatuses[item.productId] !== PRODUCT_STORE_STATUS.AVAILABLE)
+    if (unavailableItem) return setMessage(`「${unavailableItem.name}」目前未上架或已售完，請先從購物車移除。`)
     if (isStore) return submitOrder()
     setCheckoutStep('checkout')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -218,6 +259,8 @@ export default function OrderPage() {
     if (cartItems.length === 0) return setMessage('請先加入商品。')
     if (!hasProfile) return setMessage('請先完成顧客資料。')
     if (!selectedStore) return setMessage('請選擇門店。')
+    const unavailableItem = cartItems.find((item) => storeProductStatuses[item.productId] !== PRODUCT_STORE_STATUS.AVAILABLE)
+    if (unavailableItem) return setMessage(`「${unavailableItem.name}」目前未上架或已售完，請先從購物車移除。`)
     if (diningType === 'delivery' && !deliveryAddress.trim()) return setMessage('請填寫外送地址。')
     if (isOverDeliveryDistance) return setMessage(`目前距離約 ${selectedStoreDistanceKm.toFixed(1)} km，超過可外送範圍 ${maxDeliveryDistanceKm} km。`)
     if (timeType === 'now' && !timeSettings.immediateEnabled) return setMessage('目前不開放立即訂餐，請選擇預定。')
@@ -267,7 +310,7 @@ export default function OrderPage() {
     return (
       <section className="card p-4">
         <div className="flex items-center gap-2"><MapPin className="text-accent" size={18} /><h2 className="font-black">選擇門店</h2></div>
-        <select className="input mt-3" value={selectedStoreId} onChange={(event) => setSelectedStoreId(event.target.value)}>
+        <select className="input mt-3" value={selectedStoreId} onChange={(event) => { setSelectedStoreId(event.target.value); setCartItems([]) }} disabled={role === 'store' && !!adminSession?.storeId}>
           {activeStores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
         </select>
         {selectedStore?.address && <p className="mt-2 text-xs text-muted">{selectedStore.address}</p>}
@@ -279,7 +322,7 @@ export default function OrderPage() {
   function renderOrderOptionsPanel() {
     return (
       <div className="space-y-3">
-        {!isStore && renderStoreSelector()}
+        {(!isStore || isOwner) && renderStoreSelector()}
         <section className={isStore ? 'card p-3' : 'card p-4'}>
           <h2 className="font-black">用餐方式</h2>
           <div className="mt-2"><DiningTypeSelector value={diningType} onChange={setDiningType} options={activeDiningOptions} /></div>
@@ -330,7 +373,7 @@ export default function OrderPage() {
       <div>
         <label className="sr-only" htmlFor="customer-store-select">下拉選擇門店</label>
         <div className="relative rounded-2xl bg-cream px-3 py-2 pr-10">
-          <select id="customer-store-select" className="w-full appearance-none bg-transparent text-base font-black text-ink outline-none" value={selectedStoreId} onChange={(event) => setSelectedStoreId(event.target.value)}>
+          <select id="customer-store-select" className="w-full appearance-none bg-transparent text-base font-black text-ink outline-none" value={selectedStoreId} onChange={(event) => { setSelectedStoreId(event.target.value); setCartItems([]) }}>
             <option value="" disabled>下拉選擇門店</option>
             {activeStores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
           </select>
@@ -417,19 +460,19 @@ export default function OrderPage() {
               <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-3 py-3 backdrop-blur">{renderCustomerStoreHeader()}</div>
               <div className="grid grid-cols-2 gap-2 px-2 py-2.5 sm:gap-2.5 sm:px-3 md:grid-cols-3 xl:grid-cols-4">
                 {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact dense />)}
-                {visibleProducts.length === 0 && <p className="col-span-2 p-8 text-center text-sm text-muted md:col-span-3 xl:col-span-4">此分類目前沒有商品。</p>}
+                {visibleProducts.length === 0 && <p className="col-span-2 p-8 text-center text-sm text-muted md:col-span-3 xl:col-span-4">這間門店今日尚未上架此分類商品。</p>}
               </div>
             </section>
           </section>
         )}
         {isStore && (
           <section className="space-y-3">
-            <section className="card p-4"><p className="text-xs font-semibold text-accent">Counter Order</p><h1 className="mt-1 text-2xl font-black">門店櫃檯點餐</h1></section>
+            <section className="card p-4"><p className="text-xs font-semibold text-accent">Counter Order</p><h1 className="mt-1 text-2xl font-black">門店櫃檯點餐</h1><p className="mt-2 text-sm text-muted">目前門店：{selectedStore?.name || '未選擇'}</p></section>
             <section className="card p-3">
               <div className="mb-3 flex items-center gap-2"><ShoppingBag size={18} className="text-accent" /><h2 className="font-black">商品</h2></div>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
                 {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} compact dense />)}
-                {visibleProducts.length === 0 && <p className="col-span-2 p-8 text-center text-sm text-muted md:col-span-3 xl:col-span-4">此分類目前沒有商品。</p>}
+                {visibleProducts.length === 0 && <p className="col-span-2 p-8 text-center text-sm text-muted md:col-span-3 xl:col-span-4">這間門店今日尚未上架此分類商品。</p>}
               </div>
             </section>
           </section>
