@@ -2,20 +2,27 @@ import { Plus } from 'lucide-react'
 import { formatPrice } from '../utils/price'
 
 export default function ProductCard({ product, onSelect, compact = false, layout = 'grid', dense = false }) {
+  const isSoldOut = product.storeStatus === 'sold_out' || product.isSoldOut
+  const canSelect = product.isAvailable && !isSoldOut
+  const disabledClass = !canSelect ? 'opacity-55' : ''
+  const statusLabel = isSoldOut ? '售完' : (!product.isAvailable ? '已下架' : '')
+
   if (layout === 'list') {
     return (
       <button
         type="button"
-        onClick={() => product.isAvailable && onSelect(product)}
-        className={`w-full rounded-3xl bg-white p-3 text-left transition hover:bg-cream ${!product.isAvailable ? 'opacity-45' : ''}`}
+        onClick={() => canSelect && onSelect(product)}
+        disabled={!canSelect}
+        className={`w-full rounded-3xl bg-white p-3 text-left transition hover:bg-cream disabled:cursor-not-allowed ${disabledClass}`}
       >
         <div className="grid grid-cols-[96px_1fr_42px] gap-3 sm:grid-cols-[132px_1fr_48px]">
-          <div className="overflow-hidden rounded-2xl bg-cream">
+          <div className="relative overflow-hidden rounded-2xl bg-cream">
             {product.imageUrl ? (
               <img className="h-24 w-full object-cover sm:h-32" src={product.imageUrl} alt={product.name} loading="lazy" />
             ) : (
               <div className="flex h-24 w-full items-center justify-center px-3 text-center text-xs font-bold text-muted sm:h-32">{product.category || '商品圖片'}</div>
             )}
+            {isSoldOut && <span className="absolute inset-x-2 top-2 rounded-full bg-red-600 px-2 py-1 text-center text-xs font-black text-white">售完</span>}
           </div>
 
           <div className="min-w-0 py-1">
@@ -23,15 +30,15 @@ export default function ProductCard({ product, onSelect, compact = false, layout
             <h3 className="mt-1 line-clamp-2 text-base font-black leading-snug text-ink sm:text-xl">{product.name}</h3>
             <p className="mt-2 line-clamp-2 text-sm leading-5 text-muted">{product.description || '可客製化點餐選項'}</p>
             <p className="mt-3 text-lg font-black text-brand">{formatPrice(product.price)}<span className="ml-1 text-sm font-medium text-muted">/ 份</span></p>
+            {statusLabel && <div className="mt-2 text-sm font-semibold text-red-600">{statusLabel}</div>}
           </div>
 
           <div className="flex items-center justify-end">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand/70 text-white shadow-soft sm:h-12 sm:w-12">
+            <span className={`flex h-10 w-10 items-center justify-center rounded-full text-white sm:h-12 sm:w-12 ${canSelect ? 'bg-brand/70 shadow-soft' : 'bg-muted/40'}`}>
               <Plus size={24} />
             </span>
           </div>
         </div>
-        {!product.isAvailable && <div className="mt-3 text-sm font-semibold text-red-600">已下架</div>}
       </button>
     )
   }
@@ -45,8 +52,9 @@ export default function ProductCard({ product, onSelect, compact = false, layout
   return (
     <button
       type="button"
-      onClick={() => product.isAvailable && onSelect(product)}
-      className={`card overflow-hidden text-left transition hover:-translate-y-0.5 ${!product.isAvailable ? 'opacity-45' : ''}`}
+      onClick={() => canSelect && onSelect(product)}
+      disabled={!canSelect}
+      className={`card overflow-hidden text-left transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${disabledClass}`}
     >
       <div className="relative bg-cream">
         {product.imageUrl ? (
@@ -61,7 +69,8 @@ export default function ProductCard({ product, onSelect, compact = false, layout
             {product.category || '商品圖片'}
           </div>
         )}
-        <span className={`absolute flex items-center justify-center bg-white/90 text-brand shadow-soft ${plusClass}`}>
+        {isSoldOut && <span className="absolute inset-x-2 top-2 rounded-full bg-red-600 px-2 py-1 text-center text-xs font-black text-white">售完</span>}
+        <span className={`absolute flex items-center justify-center ${canSelect ? 'bg-white/90 text-brand shadow-soft' : 'bg-white/75 text-muted'} ${plusClass}`}>
           <Plus size={dense ? 16 : 18} />
         </span>
       </div>
@@ -71,7 +80,7 @@ export default function ProductCard({ product, onSelect, compact = false, layout
         <h3 className={`${titleClass} font-bold text-ink`}>{product.name}</h3>
         {!compact && !dense && <p className="mt-2 line-clamp-2 text-sm text-muted">{product.description || '可客製化點餐選項'}</p>}
         <p className={`${priceClass} font-bold text-brand`}>{formatPrice(product.price)}</p>
-        {!product.isAvailable && <div className="mt-2 text-xs font-semibold text-red-600">已下架</div>}
+        {statusLabel && <div className="mt-2 text-xs font-semibold text-red-600">{statusLabel}</div>}
       </div>
     </button>
   )
