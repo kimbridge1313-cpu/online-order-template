@@ -18,6 +18,7 @@ export default function ProductOptionModal({ product, onClose, onAdd }) {
   const unitPrice = calculateUnitPrice(product, selectedOptions)
   const subtotal = unitPrice * quantity
   const description = String(product.description || '').trim()
+  const isSoldOut = product.storeStatus === 'sold_out' || product.isSoldOut
 
   function selectSingle(groupId, optionId) {
     setSelections({ ...selections, [groupId]: optionId })
@@ -30,6 +31,10 @@ export default function ProductOptionModal({ product, onClose, onAdd }) {
   }
 
   function submit() {
+    if (isSoldOut) {
+      setError('此商品目前已售完。')
+      return
+    }
     const missing = validateRequiredOptions(product, selections)
     if (missing.length) {
       setError(`請選擇：${missing.join('、')}`)
@@ -60,6 +65,8 @@ export default function ProductOptionModal({ product, onClose, onAdd }) {
           <button className="rounded-2xl bg-white p-3" onClick={onClose} type="button"><X size={20} /></button>
         </div>
 
+        {isSoldOut && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-black text-red-700">此商品目前已售完。</p>}
+
         {product.imageUrl && (
           <div className="mt-4 overflow-hidden rounded-3xl border border-line bg-white">
             <img className="max-h-72 w-full object-cover" src={product.imageUrl} alt={product.name} loading="lazy" />
@@ -89,6 +96,7 @@ export default function ProductOptionModal({ product, onClose, onAdd }) {
                         <input
                           type={group.type === 'single' ? 'radio' : 'checkbox'}
                           checked={checked}
+                          disabled={isSoldOut}
                           onChange={() => group.type === 'single' ? selectSingle(group.id, option.id) : toggleMultiple(group.id, option.id)}
                         />
                         {option.name}
@@ -103,19 +111,19 @@ export default function ProductOptionModal({ product, onClose, onAdd }) {
 
           <label className="block space-y-1">
             <span className="label">商品備註</span>
-            <textarea className="input min-h-20" value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：不要蔥、餐點分開裝" />
+            <textarea className="input min-h-20" value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：不要蔥、餐點分開裝" disabled={isSoldOut} />
           </label>
 
           <div className="flex items-center justify-between rounded-3xl bg-white p-4">
             <span className="font-bold">數量</span>
             <div className="flex items-center gap-3">
-              <button className="btn-secondary px-4 py-2" onClick={() => setQuantity(Math.max(1, quantity - 1))} type="button">-</button>
+              <button className="btn-secondary px-4 py-2" onClick={() => setQuantity(Math.max(1, quantity - 1))} type="button" disabled={isSoldOut}>-</button>
               <span className="w-8 text-center text-lg font-bold">{quantity}</span>
-              <button className="btn-secondary px-4 py-2" onClick={() => setQuantity(quantity + 1)} type="button">+</button>
+              <button className="btn-secondary px-4 py-2" onClick={() => setQuantity(quantity + 1)} type="button" disabled={isSoldOut}>+</button>
             </div>
           </div>
           {error && <p className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
-          <button className="btn-primary w-full text-base" onClick={submit} type="button">加入購物車｜{formatPrice(subtotal)}</button>
+          <button className="btn-primary w-full text-base" onClick={submit} type="button" disabled={isSoldOut}>{isSoldOut ? '已售完' : `加入購物車｜${formatPrice(subtotal)}`}</button>
         </div>
       </div>
     </div>
