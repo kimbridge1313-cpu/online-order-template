@@ -8,6 +8,7 @@ import { productService } from '../services/productService'
 import { orderService } from '../services/orderService'
 import { defaultStoreSettings, defaultStores, normalizeStoreSettings, storeConfigService } from '../services/storeConfigService'
 import { PRODUCT_STORE_STATUS, getStoreStatusDate, storeProductStatusService } from '../services/storeProductStatusService'
+import { liffService } from '../services/liffService'
 import { calculateCartTotal, formatPrice } from '../utils/price'
 import { env } from '../config/env'
 import { readStorage, writeStorage } from '../utils/storage'
@@ -36,9 +37,16 @@ function getDistanceKm(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
 }
 
+function getMockLineProfile() {
+  if (!env.useMockData || !readStorage(MOCK_LINE_LOGIN_KEY, false)) return null
+  return { userId: 'mock-line-user-id', displayName: 'LINE 模擬顧客', pictureUrl: '', updatedAt: new Date().toISOString() }
+}
+
 export default function OrderPage({ role: roleProp, adminSession }) {
   const [role] = useState(() => roleProp || readStorage(MOCK_ROLE_KEY, 'customer'))
-  const [isLineLoggedIn] = useState(() => readStorage(MOCK_LINE_LOGIN_KEY, false))
+  const [lineProfile, setLineProfile] = useState(() => getMockLineProfile() || liffService.getCachedProfile())
+  const [lineChecking, setLineChecking] = useState(false)
+  const [lineStatusMessage, setLineStatusMessage] = useState('')
   const [allowNoLineOrder, setAllowNoLineOrder] = useState(false)
   const [noLineExpanded, setNoLineExpanded] = useState(false)
   const [profile, setProfile] = useState(() => readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' }))
@@ -68,6 +76,7 @@ export default function OrderPage({ role: roleProp, adminSession }) {
   const isStore = role === 'store' || role === 'owner'
   const isOwner = role === 'owner'
   const activeStores = stores.filter((store) => store.isActive !== false)
+  const isLineLoggedIn = Boolean(lineProfile?.userId)
   const hasProfile = isStore || Boolean(profile?.name && profile?.phone)
   const source = isStore ? 'counter' : 'customer_online'
   const cartTotal = calculateCartTotal(cartItems)
@@ -110,6 +119,29 @@ export default function OrderPage({ role: roleProp, adminSession }) {
     loadConfig()
     return () => { mounted = false }
   }, [])
+
+  useEffect(() => {
+    let mounted = true
+    async function loadCustomerLineProfile() {
+      if (isStore || env.useMockData || !env.isLiffEnabled || lineProfile?.userId) return
+      setLineChecking(true)
+      try {
+        const profileData = await liffService.getProfile({ requireLogin: false })
+        if (!mounted || !profileData?.userId) return
+        setLineProfile(profileData)
+        setLineStatusMessage('')
+        setAllowNoLineOrder(false)
+        setNoLineExpanded(false)
+        setProfileDraft((current) => current.name ? current : { ...current, name: profileData.displayName || '' })
+      } catch (error) {
+        if (mounted) setLineStatusMessage(error.message || '目前無法確認 LINE 身份。')
+      } finally {
+        if (mounted) setLineChecking(false)
+      }
+    }
+    loadCustomerLineProfile()
+    return () => { mounted = false }
+  }, [isStore, lineProfile?.userId])
 
   useEffect(() => {
     let mounted = true
@@ -179,6 +211,33 @@ export default function OrderPage({ role: roleProp, adminSession }) {
   const categories = useMemo(() => ['全部', ...Array.from(new Set(storeVisibleProducts.map((p) => p.category)))], [storeVisibleProducts])
   const visibleProducts = storeVisibleProducts.filter((product) => category === '全部' || product.category === category)
 
+  async function connectLineProfile() {
+    setLineStatusMessage('')
+    setLineChecking(true)
+    try {
+      if (env.useMockData) {
+        const mockProfile = { userId: 'mock-line-user-id', displayName: 'LINE 模擬顧客', pictureUrl: '', updatedAt: new Date().toISOString() }
+        setLineProfile(mockProfile)
+        writeStorage(MOCK_LINE_LOGIN_KEY, true)
+        return
+      }
+      if (!env.isLiffEnabled) {
+        setLineStatusMessage('尚未設定 LIFF ID，無法取得 LINE 身份。')
+        return
+      }
+      const profileData = await liffService.getProfile({ requireLogin: true })
+      if (!profileData?.userId) return
+      setLineProfile(profileData)
+      setAllowNoLineOrder(false)
+      setNoLineExpanded(false)
+      setProfileDraft((current) => current.name ? current : { ...current, name: profileData.displayName || '' })
+    } catch (error) {
+      setLineStatusMessage(error.message || 'LINE 授權失敗，請重新開啟此頁。')
+    } finally {
+      setLineChecking(false)
+    }
+  }
+
   function saveProfile(event) {
     event.preventDefault()
     if (!profileDraft.name || !profileDraft.phone) return setMessage('請填寫姓名與電話。')
@@ -233,9 +292,13 @@ export default function OrderPage({ role: roleProp, adminSession }) {
         <section className="card border-accent/30 bg-green-50/80 p-7 text-center">
           <MessageCircle className="mx-auto text-accent" size={52} />
           <h1 className="mt-4 text-3xl font-black">使用 LINE 開始點餐</h1>
-          <p className="mt-3 text-sm leading-6 text-muted">建議使用 LINE 點餐，才能收到店家接單、取消與訂單狀態通知。</p>
-          <a className={`btn-primary mt-6 inline-block ${!env.lineOfficialAccountUrl ? 'pointer-events-none opacity-40' : ''}`} href={env.lineOfficialAccountUrl || '#'} target="_blank" rel="noreferrer">加入 LINE 官方帳號</a>
-          <p className="mt-3 text-xs leading-5 text-muted">加入後請回到此頁繼續點餐。</p>
+          <p className="mt-3 text-sm leading-6 text-muted">按下方按鈕授權 LINE 身份，系統才會取得你的 LINE ID 並發送訂單通知。</p>
+          <button className="btn-primary mt-6 w-full" type="button" onClick={connectLineProfile} disabled={lineChecking || (!env.useMockData && !env.isLiffEnabled)}>
+            {lineChecking ? '正在確認 LINE 身份...' : '使用 LINE 授權點餐'}
+          </button>
+          {env.lineOfficialAccountUrl && <a className="btn-secondary mt-3 inline-block w-full" href={env.lineOfficialAccountUrl} target="_blank" rel="noreferrer">加入官方帳號</a>}
+          <p className="mt-3 text-xs leading-5 text-muted">加入官方帳號只會加好友；「LINE 授權點餐」才會把 LINE ID 寫入訂單。</p>
+          {lineStatusMessage && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{lineStatusMessage}</p>}
         </section>
 
         <section className="mt-4 rounded-3xl border border-line bg-white/80 p-4">
@@ -267,7 +330,7 @@ export default function OrderPage({ role: roleProp, adminSession }) {
     if (timeType === 'scheduled' && !getScheduledTime()) return setMessage('請選擇預定日期與時間。')
     if (timeType === 'scheduled' && orderDate < minScheduledDate) return setMessage(`預定日期至少需提前 ${timeSettings.preorderMinDays || 0} 天。`)
 
-    const customerLineUserId = !isStore && isLineLoggedIn ? 'mock-line-user-id' : ''
+    const customerLineUserId = !isStore ? lineProfile?.userId || '' : ''
     const order = await orderService.createOrder({
       source,
       store: selectedStore ? { id: selectedStore.id, name: selectedStore.name } : null,
@@ -275,7 +338,8 @@ export default function OrderPage({ role: roleProp, adminSession }) {
         name: isStore ? '門店櫃檯' : profile.name,
         phone: isStore ? '' : profile.phone,
         lineUserId: customerLineUserId,
-        lineDisplayName: customerLineUserId ? profile.name : ''
+        lineDisplayName: customerLineUserId ? lineProfile?.displayName || profile.name : '',
+        linePictureUrl: customerLineUserId ? lineProfile?.pictureUrl || '' : ''
       },
       diningType,
       deliveryAddress: diningType === 'delivery' ? deliveryAddress.trim() : '',
@@ -380,6 +444,7 @@ export default function OrderPage({ role: roleProp, adminSession }) {
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-brand" size={18} />
         </div>
         {selectedStore && <p className="mt-1.5 text-[11px] leading-4 text-muted">{selectedStore.name}{storeLocationMessage ? `｜${storeLocationMessage}` : ''}</p>}
+        {isLineLoggedIn && <p className="mt-1 text-[11px] leading-4 text-accent">LINE 已連結：{lineProfile.displayName || '顧客'}</p>}
       </div>
     )
   }
@@ -394,6 +459,7 @@ export default function OrderPage({ role: roleProp, adminSession }) {
           <UserRound className="text-accent" size={36} />
           <h1 className="mt-3 text-3xl font-black">建立訂餐資料</h1>
           <p className="mt-2 text-sm leading-6 text-muted">初次訂餐請填寫姓名與電話。資料僅限訂單聯絡使用。</p>
+          {isLineLoggedIn && <p className="mt-4 rounded-2xl bg-green-50 p-3 text-sm font-semibold text-green-700">LINE 已連結：{lineProfile.displayName || '顧客'}</p>}
           {allowNoLineOrder && renderLineWarning('mt-4')}
           <div className="mt-5 space-y-3">
             <label className="block space-y-1"><span className="label">姓名 *</span><input className="input" value={profileDraft.name} onChange={(event) => setProfileDraft({ ...profileDraft, name: event.target.value })} required /></label>
@@ -429,6 +495,7 @@ export default function OrderPage({ role: roleProp, adminSession }) {
             <p className="text-xs font-semibold text-accent">Checkout</p>
             <h1 className="mt-1 text-3xl font-black">確認訂單</h1>
             <p className="mt-2 text-sm text-muted">確認門店、用餐方式、用餐 / 取餐 / 外送時間與訂單聯絡資料。</p>
+            {isLineLoggedIn && <p className="mt-4 rounded-2xl bg-green-50 p-3 text-sm font-semibold text-green-700">LINE 通知將傳送給：{lineProfile.displayName || profile.name}</p>}
             {allowNoLineOrder && renderLineWarning('mt-4')}
           </section>
           {renderOrderOptionsPanel()}
