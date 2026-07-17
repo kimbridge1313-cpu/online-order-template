@@ -13,6 +13,18 @@ const STORES_COLLECTION = 'stores'
 const defaultDiningModules = { dine_in: true, takeaway: true, delivery: false }
 const defaultDeliverySettings = { freeDeliveryMinAmount: 0, maxDeliveryDistanceKm: 0 }
 const defaultTimeSettings = { immediateEnabled: true, scheduledEnabled: true, preorderMinDays: 0 }
+const defaultDiscountSettings = { discounts: [] }
+
+function normalizeDiscount(discount = {}) {
+  return {
+    id: discount.id || `discount-${Date.now()}`,
+    name: String(discount.name || '').trim(),
+    type: discount.type || 'fixed_amount',
+    value: Number(discount.value || 0),
+    isActive: discount.isActive !== false,
+    note: String(discount.note || '').trim()
+  }
+}
 
 export const defaultStoreSettings = {
   brandName: '示範店家',
@@ -23,7 +35,8 @@ export const defaultStoreSettings = {
   tableNumbers: [],
   diningModules: defaultDiningModules,
   deliverySettings: defaultDeliverySettings,
-  timeSettings: defaultTimeSettings
+  timeSettings: defaultTimeSettings,
+  discountSettings: defaultDiscountSettings
 }
 
 export const defaultStores = [
@@ -31,6 +44,7 @@ export const defaultStores = [
 ]
 
 export function normalizeStoreSettings(rawSettings = {}) {
+  const rawDiscountSettings = rawSettings.discountSettings || {}
   return {
     ...defaultStoreSettings,
     ...rawSettings,
@@ -48,6 +62,11 @@ export function normalizeStoreSettings(rawSettings = {}) {
     timeSettings: {
       ...defaultTimeSettings,
       ...(rawSettings.timeSettings || {})
+    },
+    discountSettings: {
+      ...defaultDiscountSettings,
+      ...rawDiscountSettings,
+      discounts: (rawDiscountSettings.discounts || []).map(normalizeDiscount).filter((discount) => discount.name)
     }
   }
 }
