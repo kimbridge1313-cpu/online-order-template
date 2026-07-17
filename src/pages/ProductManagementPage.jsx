@@ -23,12 +23,21 @@ function getInitialCategories(products) {
   return Array.from(new Set(merged))
 }
 
+function isProductAvailable(product) {
+  return product?.isAvailable !== false
+}
+
 function getStatusLabel(status) {
   return statusOptions.find((item) => item.value === status)?.label || '下架'
 }
 
 function getStatusClass(status) {
   return statusOptions.find((item) => item.value === status)?.className || 'bg-gray-100 text-gray-700'
+}
+
+function getErrorMessage(error) {
+  if (String(error?.message || '').includes('permission')) return '更新失敗：Firestore 權限未開放，請確認 products / storeProductStatus 規則允許寫入。'
+  return error?.message || '更新失敗，請稍後再試。'
 }
 
 export default function ProductManagementPage({ role: roleProp, adminSession }) {
@@ -108,7 +117,7 @@ export default function ProductManagementPage({ role: roleProp, adminSession }) 
   async function saveProduct(product) {
     const savedCategory = product.category || categories[0] || '未分類'
     if (!categories.includes(savedCategory)) persistCategories([...categories, savedCategory])
-    await productService.saveProduct({ ...product, category: savedCategory })
+    await productService.saveProduct({ ...product, category: savedCategory, isAvailable: product.isAvailable !== false })
     closeEditor()
     await loadProducts()
   }
@@ -120,34 +129,71 @@ export default function ProductManagementPage({ role: roleProp, adminSession }) 
   }
 
   async function toggleAvailable(product) {
-    await productService.saveProduct({ ...product, isAvailable: !product.isAvailable })
-    await loadProducts()
+    const currentlyAvailable = isProductAvailable(product)
+    const nextAvailable = !currentlyAvailable
+    setStatusMessage('')
+    setProducts((current) => current.map((item) => item.id === product.id ? { ...item, isAvailable: nextAvailable } : item))
+    try {
+      await productService.saveProduct({ ...product, isAvailable: nextAvailable })
+      await loadProducts()
+      setStatusMessage(`已${nextAvailable ? '上架' : '下架'}「${product.name}」。`)
+    } catch (error) {
+      setProducts((current) => current.map((item) => item.id === product.id ? product : item))
+      setStatusMessage(getErrorMessage(error))
+    }
   }
 
   async function setTodayStatus(productId, status) {
     if (!selectedStoreId) return
+    const previousStatuses = storeStatuses
     setStatusMessage('')
-    const nextStatuses = await storeProductStatusService.saveStoreProductStatus({
-      storeId: selectedStoreId,
-      productId,
-      status,
-      date: today
+    setStoreStatuses((current) => {
+      const next = { ...current }
+      if (status === PRODUCT_STORE_STATUS.HIDDEN) delete next[productId]
+      else next[productId] = status
+      return next
     })
-    setStoreStatuses(nextStatuses)
-    setStatusMessage(`已更新 ${selectedStore?.name || '門店'} 今日商品狀態。`)
+    try {
+      const nextStatuses = await storeProductStatusService.saveStoreProductStatus({
+        storeId: selectedStoreId,
+        productId,
+        status,
+        date: today
+      })
+      setStoreStatuses(nextStatuses)
+      setStatusMessage(`已更新 ${selectedStore?.name || '門店'} 今日商品狀態。`)
+    } catch (error) {
+      setStoreStatuses(previousStatuses)
+      setStatusMessage(getErrorMessage(error))
+    }
   }
 
   async function bulkSetTodayStatus(status) {
     if (!selectedStoreId) return
-    const productIds = products.filter((product) => product.isAvailable !== false).map((product) => product.id)
-    const nextStatuses = await storeProductStatusService.bulkSaveStoreProductStatuses({
-      storeId: selectedStoreId,
-      productIds,
-      status,
-      date: today
+    const productIds = products.filter(isProductAvailable).map((product) => product.id)
+    const previousStatuses = storeStatuses
+    setStatusMessage('')
+    setStoreStatuses((current) => {
+      const next = { ...current }
+      productIds.forEach((productId) => {
+        if (status === PRODUCT_STORE_STATUS.HIDDEN) delete next[productId]
+        else next[productId] = status
+      })
+      return next
     })
-    setStoreStatuses(nextStatuses)
-    setStatusMessage(`已將 ${selectedStore?.name || '門店'} 今日商品全部設為「${getStatusLabel(status)}」。`)
+    try {
+      const nextStatuses = await storeProductStatusService.bulkSaveStoreProductStatuses({
+        storeId: selectedStoreId,
+        productIds,
+        status,
+        date: today
+      })
+      setStoreStatuses(nextStatuses)
+      setStatusMessage(`已將 ${selectedStore?.name || '門店'} 今日商品全部設為「${getStatusLabel(status)}」。`)
+    } catch (error) {
+      setStoreStatuses(previousStatuses)
+      setStatusMessage(getErrorMessage(error))
+    }
   }
 
   async function resetProducts() {
@@ -168,6 +214,7 @@ export default function ProductManagementPage({ role: roleProp, adminSession }) 
     setIsCreating(false)
     setEditingProduct({
       ...product,
+      isAvailable: isProductAvailable(product),
       optionGroups: (product.optionGroups || []).map((group) => ({
         ...group,
         options: (group.options || []).map((option) => ({ ...option }))
@@ -262,7 +309,7 @@ export default function ProductManagementPage({ role: roleProp, adminSession }) 
             <button className="rounded-2xl bg-red-100 px-3 py-2 text-xs font-black text-red-800" type="button" onClick={() => bulkSetTodayStatus(PRODUCT_STORE_STATUS.SOLD_OUT)}>全部售完</button>
             <button className="rounded-2xl bg-gray-100 px-3 py-2 text-xs font-black text-gray-700" type="button" onClick={() => bulkSetTodayStatus(PRODUCT_STORE_STATUS.HIDDEN)}>全部下架</button>
           </div>
-          {statusMessage && <p className="mt-3 rounded-2xl bg-cream p-3 text-sm font-semibold text-muted">{statusMessage}</p>}
+          {statusMessage && <p className={`mt-3 rounded-2xl p-3 text-sm font-semibold ${statusMessage.includes('失敗') ? 'bg-red-50 text-red-700' : 'bg-cream text-muted'}`}>{statusMessage}</p>}
         </section>
 
         <section className="card p-5">
@@ -317,8 +364,9 @@ export default function ProductManagementPage({ role: roleProp, adminSession }) 
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {visibleProducts.map((product) => {
               const todayStatus = getProductStoreStatus(product.id)
+              const available = isProductAvailable(product)
               return (
-                <article key={product.id} className={`card flex flex-col overflow-hidden ${!product.isAvailable ? 'opacity-60' : ''}`}>
+                <article key={product.id} className={`card flex flex-col overflow-hidden ${!available ? 'opacity-60' : ''}`}>
                   <div className="h-40 bg-cream">
                     {product.imageUrl ? (
                       <img className="h-full w-full object-cover" src={product.imageUrl} alt={product.name} loading="lazy" />
@@ -334,7 +382,7 @@ export default function ProductManagementPage({ role: roleProp, adminSession }) 
                         <p className="mt-2 line-clamp-2 text-sm text-muted">{product.description || '未填寫商品描述'}</p>
                       </div>
                       <div className="shrink-0 space-y-2 text-right">
-                        <span className={`inline-block rounded-full px-3 py-1 text-xs font-bold ${product.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{product.isAvailable ? '主檔上架' : '主檔下架'}</span>
+                        <span className={`inline-block rounded-full px-3 py-1 text-xs font-bold ${available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{available ? '主檔上架' : '主檔下架'}</span>
                         <span className={`block rounded-full px-3 py-1 text-xs font-bold ${getStatusClass(todayStatus)}`}>今日{getStatusLabel(todayStatus)}</span>
                       </div>
                     </div>
@@ -346,7 +394,7 @@ export default function ProductManagementPage({ role: roleProp, adminSession }) 
                           className={`rounded-2xl px-3 py-2 text-xs font-black ${todayStatus === statusOption.value ? statusOption.className : 'bg-white text-muted border border-line'}`}
                           type="button"
                           onClick={() => setTodayStatus(product.id, statusOption.value)}
-                          disabled={!product.isAvailable}
+                          disabled={!available}
                         >
                           {statusOption.label}
                         </button>
@@ -360,7 +408,7 @@ export default function ProductManagementPage({ role: roleProp, adminSession }) 
                       </div>
                       <div className="flex flex-wrap justify-end gap-2">
                         <button className="btn-secondary py-2" onClick={() => editProduct(product)} type="button">編輯</button>
-                        <button className="btn-secondary py-2" onClick={() => toggleAvailable(product)} type="button">{product.isAvailable ? '主檔下架' : '主檔上架'}</button>
+                        <button className="btn-secondary py-2" onClick={() => toggleAvailable(product)} type="button">{available ? '主檔下架' : '主檔上架'}</button>
                         <button className="btn-danger py-2" onClick={() => deleteProduct(product.id)} type="button">刪除</button>
                       </div>
                     </div>
