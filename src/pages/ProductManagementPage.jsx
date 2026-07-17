@@ -17,8 +17,9 @@ const statusOptions = [
 
 function getInitialCategories(products) {
   const saved = readStorage(CATEGORY_STORAGE_KEY, null)
+  if (Array.isArray(saved)) return saved
   const productCategories = products.map((product) => product.category).filter(Boolean)
-  const merged = [...(saved || []), ...productCategories, ...FALLBACK_CATEGORIES]
+  const merged = [...productCategories, ...FALLBACK_CATEGORIES]
   return Array.from(new Set(merged))
 }
 
@@ -269,8 +270,9 @@ export default function ProductManagementPage({ role: roleProp, adminSession }) 
             <Tags className="text-accent" size={18} />
             <h2 className="font-black">商品分類</h2>
           </div>
+          <p className="mt-2 text-sm leading-6 text-muted">分類可自行新增、改名或刪除；預設分類只會在第一次初始化時出現。</p>
           <div className="mt-4 flex gap-2">
-            <input className="input" placeholder="新增分類，例如：飲品" value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addCategory() }} />
+            <input className="input" placeholder="新增分類，例如：麵包" value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addCategory() }} />
             <button className="btn-primary shrink-0" type="button" onClick={addCategory}>新增</button>
           </div>
 
