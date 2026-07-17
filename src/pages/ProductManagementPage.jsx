@@ -361,61 +361,74 @@ export default function ProductManagementPage({ role: roleProp, adminSession }) 
             <p className="mt-2 text-sm text-muted">請新增商品，或切換到其他分類。</p>
           </section>
         ) : (
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {visibleProducts.map((product) => {
-              const todayStatus = getProductStoreStatus(product.id)
-              const available = isProductAvailable(product)
-              return (
-                <article key={product.id} className={`card flex flex-col overflow-hidden ${!available ? 'opacity-60' : ''}`}>
-                  <div className="h-40 bg-cream">
-                    {product.imageUrl ? (
-                      <img className="h-full w-full object-cover" src={product.imageUrl} alt={product.name} loading="lazy" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm font-bold text-muted">尚未上傳圖片</div>
-                    )}
-                  </div>
-                  <div className="flex flex-1 flex-col p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-semibold text-accent">{product.category}</p>
-                        <h3 className="mt-1 text-xl font-black text-ink">{product.name}</h3>
-                        <p className="mt-2 line-clamp-2 text-sm text-muted">{product.description || '未填寫商品描述'}</p>
+          <section className="card overflow-hidden">
+            <div className="border-b border-line px-4 py-3">
+              <p className="font-black">商品清單</p>
+              <p className="mt-1 text-xs text-muted">目前顯示 {visibleProducts.length} 個商品。可直接調整主檔狀態與今日販售狀態。</p>
+            </div>
+            <div className="divide-y divide-line">
+              {visibleProducts.map((product) => {
+                const todayStatus = getProductStoreStatus(product.id)
+                const available = isProductAvailable(product)
+                return (
+                  <article key={product.id} className={`grid gap-3 px-3 py-3 md:grid-cols-[56px_1.4fr_0.8fr_0.8fr_1.3fr_1.1fr] md:items-center md:px-4 ${!available ? 'bg-gray-50 opacity-75' : 'bg-white'}`}>
+                    <div className="flex items-center gap-3 md:block">
+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-cream">
+                        {product.imageUrl ? (
+                          <img className="h-full w-full object-cover" src={product.imageUrl} alt={product.name} loading="lazy" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-muted">無圖</div>
+                        )}
                       </div>
-                      <div className="shrink-0 space-y-2 text-right">
-                        <span className={`inline-block rounded-full px-3 py-1 text-xs font-bold ${available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{available ? '主檔上架' : '主檔下架'}</span>
-                        <span className={`block rounded-full px-3 py-1 text-xs font-bold ${getStatusClass(todayStatus)}`}>今日{getStatusLabel(todayStatus)}</span>
+                      <div className="min-w-0 md:hidden">
+                        <h3 className="truncate text-base font-black text-ink">{product.name}</h3>
+                        <p className="mt-1 text-xs text-muted">{product.category || '未分類'}｜{formatPrice(product.price)}</p>
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-3 gap-2">
-                      {statusOptions.map((statusOption) => (
-                        <button
-                          key={statusOption.value}
-                          className={`rounded-2xl px-3 py-2 text-xs font-black ${todayStatus === statusOption.value ? statusOption.className : 'bg-white text-muted border border-line'}`}
-                          type="button"
-                          onClick={() => setTodayStatus(product.id, statusOption.value)}
-                          disabled={!available}
-                        >
-                          {statusOption.label}
-                        </button>
-                      ))}
+                    <div className="hidden min-w-0 md:block">
+                      <h3 className="truncate text-sm font-black text-ink">{product.name}</h3>
+                      <p className="mt-1 line-clamp-1 text-xs text-muted">{product.description || '未填寫商品描述'}</p>
                     </div>
 
-                    <div className="mt-5 flex items-end justify-between gap-3">
-                      <div>
-                        <p className="text-2xl font-black text-brand">{formatPrice(product.price)}</p>
-                        <p className="mt-1 text-xs text-muted">{product.optionGroups?.length || 0} 組客製化選項</p>
+                    <div className="hidden text-sm md:block">
+                      <p className="font-bold text-ink">{product.category || '未分類'}</p>
+                      <p className="mt-1 text-xs text-muted">{product.optionGroups?.length || 0} 組選項</p>
+                    </div>
+
+                    <div className="hidden text-sm md:block">
+                      <p className="text-lg font-black text-brand">{formatPrice(product.price)}</p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{available ? '主檔上架' : '主檔下架'}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${getStatusClass(todayStatus)}`}>今日{getStatusLabel(todayStatus)}</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {statusOptions.map((statusOption) => (
+                          <button
+                            key={statusOption.value}
+                            className={`rounded-xl px-2 py-1.5 text-xs font-black ${todayStatus === statusOption.value ? statusOption.className : 'border border-line bg-white text-muted'}`}
+                            type="button"
+                            onClick={() => setTodayStatus(product.id, statusOption.value)}
+                            disabled={!available}
+                          >
+                            {statusOption.label}
+                          </button>
+                        ))}
                       </div>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <button className="btn-secondary py-2" onClick={() => editProduct(product)} type="button">編輯</button>
-                        <button className="btn-secondary py-2" onClick={() => toggleAvailable(product)} type="button">{available ? '主檔下架' : '主檔上架'}</button>
-                        <button className="btn-danger py-2" onClick={() => deleteProduct(product.id)} type="button">刪除</button>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button className="rounded-xl border border-line bg-white px-2.5 py-1.5 text-xs font-bold text-muted hover:text-brand" onClick={() => editProduct(product)} type="button">編輯</button>
+                        <button className="rounded-xl border border-line bg-white px-2.5 py-1.5 text-xs font-bold text-muted hover:text-brand" onClick={() => toggleAvailable(product)} type="button">{available ? '主檔下架' : '主檔上架'}</button>
+                        <button className="rounded-xl border border-red-200 bg-white px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50" onClick={() => deleteProduct(product.id)} type="button">刪除</button>
                       </div>
                     </div>
-                  </div>
-                </article>
-              )
-            })}
+                  </article>
+                )
+              })}
+            </div>
           </section>
         )}
       </main>
