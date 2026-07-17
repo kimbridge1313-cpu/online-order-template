@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Minus, Plus, Trash2 } from 'lucide-react'
-import { calculateCartTotal, formatPrice } from '../utils/price'
+import { calculateCartTotal, calculateDiscountAmount, calculateOrderTotal, formatPrice } from '../utils/price'
 
 function recalcItem(item, quantity) {
   const nextQuantity = Math.max(1, Number(quantity || 1))
@@ -12,12 +12,36 @@ function recalcItem(item, quantity) {
   }
 }
 
-export default function CartPanel({ items, onRemove, onSubmit, onQuantityChange, disabled, submitLabel = '送出訂單', title = '購物車', compact = false, defaultCollapsed = false }) {
+function discountLabel(discount) {
+  if (discount.type === 'fixed_amount') return `${discount.name}｜-${formatPrice(discount.value)}`
+  if (discount.type === 'percent') return `${discount.name}｜${discount.value}%`
+  if (discount.type === 'bogo') return `${discount.name}｜買一送一`
+  return discount.name
+}
+
+export default function CartPanel({
+  items,
+  onRemove,
+  onSubmit,
+  onQuantityChange,
+  discounts = [],
+  selectedDiscounts = [],
+  onToggleDiscount,
+  disabled,
+  submitLabel = '送出訂單',
+  title = '購物車',
+  compact = false,
+  defaultCollapsed = false
+}) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed || compact)
   const [, forceRender] = useState(0)
-  const total = calculateCartTotal(items)
+  const subtotal = calculateCartTotal(items)
+  const selectedDiscountIds = selectedDiscounts.map((discount) => discount.id)
+  const discountAmount = calculateDiscountAmount(items, selectedDiscounts)
+  const total = calculateOrderTotal(items, selectedDiscounts)
   const itemCount = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
   const isCollapsed = compact && collapsed
+  const activeDiscounts = discounts.filter((discount) => discount.isActive !== false)
 
   function editQuantity(index, quantity) {
     if (onQuantityChange) {
@@ -74,9 +98,34 @@ export default function CartPanel({ items, onRemove, onSubmit, onQuantityChange,
             ))}
           </div>
 
-          <div className={`${compact ? 'mt-3 pt-3' : 'mt-4 pt-4'} flex items-center justify-between border-t border-line`}>
-            <span className="font-bold">總金額</span>
-            <span className={compact ? 'text-xl font-black text-brand' : 'text-2xl font-black text-brand'}>{formatPrice(total)}</span>
+          {activeDiscounts.length > 0 && items.length > 0 && (
+            <section className={`${compact ? 'mt-3 pt-3' : 'mt-4 pt-4'} border-t border-line`}>
+              <p className="text-sm font-bold">可用折扣</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {activeDiscounts.map((discount) => {
+                  const selected = selectedDiscountIds.includes(discount.id)
+                  return (
+                    <button
+                      key={discount.id}
+                      className={`rounded-2xl px-3 py-2 text-xs font-black ${selected ? 'bg-brand text-white' : 'border border-line bg-white text-muted'}`}
+                      type="button"
+                      onClick={() => onToggleDiscount?.(discount)}
+                    >
+                      {discountLabel(discount)}
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+
+          <div className={`${compact ? 'mt-3 pt-3' : 'mt-4 pt-4'} space-y-2 border-t border-line`}>
+            <div className="flex items-center justify-between text-sm text-muted"><span>小計</span><span>{formatPrice(subtotal)}</span></div>
+            {discountAmount > 0 && <div className="flex items-center justify-between text-sm font-bold text-red-600"><span>折扣</span><span>-{formatPrice(discountAmount)}</span></div>}
+            <div className="flex items-center justify-between">
+              <span className="font-bold">總金額</span>
+              <span className={compact ? 'text-xl font-black text-brand' : 'text-2xl font-black text-brand'}>{formatPrice(total)}</span>
+            </div>
           </div>
           <button className={`btn-primary w-full ${compact ? 'mt-3 py-3' : 'mt-4'}`} type="button" disabled={disabled || items.length === 0} onClick={onSubmit}>{submitLabel}</button>
         </>
