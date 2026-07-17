@@ -32,15 +32,21 @@ function waitForLiff(timeoutMs = 3000) {
   })
 }
 
+async function getInitializedLiff() {
+  if (!env.isLiffEnabled) return null
+  const liff = await waitForLiff()
+  await liff.init({ liffId: env.lineLiffId })
+  return liff
+}
+
 export const liffService = {
   getCachedProfile() {
     return readCachedProfile()
   },
 
   async getProfile({ requireLogin = false } = {}) {
-    if (!env.isLiffEnabled) return null
-    const liff = await waitForLiff()
-    await liff.init({ liffId: env.lineLiffId })
+    const liff = await getInitializedLiff()
+    if (!liff) return null
 
     if (!liff.isLoggedIn()) {
       if (requireLogin) {
@@ -59,5 +65,24 @@ export const liffService = {
     }
     writeCachedProfile(normalized)
     return normalized
+  },
+
+  async requestOfficialAccountFriendship() {
+    const liff = await getInitializedLiff()
+    if (!liff || !liff.isLoggedIn()) return { available: false, friendFlag: null }
+
+    try {
+      if (typeof liff.getFriendship === 'function') {
+        const friendship = await liff.getFriendship()
+        if (friendship?.friendFlag) return { available: true, friendFlag: true }
+      }
+      if (typeof liff.requestFriendship === 'function') {
+        await liff.requestFriendship()
+        return { available: true, friendFlag: null }
+      }
+    } catch (error) {
+      console.warn('LIFF friendship request skipped:', error)
+    }
+    return { available: false, friendFlag: null }
   }
 }
