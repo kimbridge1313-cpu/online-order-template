@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, orderBy, query, setDoc } from 'firebase/firestore'
+import { collection, doc, getDocs, orderBy, query, setDoc, where } from 'firebase/firestore'
 import { assertFirestoreReady } from '../config/firebase'
 import { createOrderNumber } from '../utils/orderNumber'
 import { lineNotificationService } from './lineNotificationService'
@@ -27,6 +27,19 @@ export const firebaseOrderService = {
   async listOrders() {
     const db = assertFirestoreReady()
     const snapshot = await getDocs(query(collection(db, COLLECTION), orderBy('createdAt', 'desc')))
+    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+  },
+
+  async listCustomerOrders(lineUserId) {
+    const cleanLineUserId = String(lineUserId || '').trim()
+    if (!cleanLineUserId) return []
+    const db = assertFirestoreReady()
+    const snapshot = await getDocs(query(
+      collection(db, COLLECTION),
+      where('source', '==', 'customer_online'),
+      where('customer.lineUserId', '==', cleanLineUserId),
+      orderBy('createdAt', 'desc')
+    ))
     return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
   },
 
