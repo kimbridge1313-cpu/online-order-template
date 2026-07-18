@@ -12,6 +12,10 @@ function saveAll(orders) {
   writeStorage(STORAGE_KEY, orders)
 }
 
+function sortByCreatedAtDesc(orders = []) {
+  return [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+}
+
 function defaultPaymentStatus(payload = {}) {
   if (payload.paymentStatus) return payload.paymentStatus
   return payload.source === 'counter' ? 'paid' : 'unpaid'
@@ -28,7 +32,14 @@ function shouldNotifyLine(order) {
 
 export const mockOrderService = {
   async listOrders() {
-    return list().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    return sortByCreatedAtDesc(list())
+  },
+  async listCustomerOrders(lineUserId) {
+    const cleanLineUserId = String(lineUserId || '').trim()
+    if (!cleanLineUserId) return []
+    return sortByCreatedAtDesc(list().filter((order) => (
+      order.source === 'customer_online' && order.customer?.lineUserId === cleanLineUserId
+    )))
   },
   async createOrder(payload) {
     const now = new Date().toISOString()
