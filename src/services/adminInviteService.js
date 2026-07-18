@@ -77,7 +77,16 @@ async function getInviteWithFirebase(code) {
   return invite
 }
 
-async function acceptInviteWithFirebase({ code, username, password, displayName }) {
+function normalizeLineProfile(lineProfile) {
+  if (!lineProfile?.userId) return null
+  return {
+    userId: String(lineProfile.userId),
+    displayName: lineProfile.displayName || '',
+    pictureUrl: lineProfile.pictureUrl || ''
+  }
+}
+
+async function acceptInviteWithFirebase({ code, username, password, displayName, lineProfile: providedLineProfile }) {
   const db = assertFirestoreReady()
   const invite = await getInviteWithFirebase(code)
   const cleanUsername = String(username || '').trim()
@@ -88,12 +97,14 @@ async function acceptInviteWithFirebase({ code, username, password, displayName 
   const exists = await getDoc(userRef)
   if (exists.exists()) throw new Error('此帳號已存在，請改用其他帳號。')
 
-  const lineProfile = env.isLiffEnabled
+  const explicitLineProfile = normalizeLineProfile(providedLineProfile)
+  const fallbackLineProfile = explicitLineProfile ? null : (env.isLiffEnabled
     ? await liffService.getProfile({ requireLogin: false }).catch((error) => {
       console.warn('LINE profile optional for invite accept:', error)
       return null
     })
-    : null
+    : null)
+  const lineProfile = explicitLineProfile || normalizeLineProfile(fallbackLineProfile)
 
   const now = new Date().toISOString()
   const linePatch = lineProfile?.userId ? {
@@ -109,7 +120,7 @@ async function acceptInviteWithFirebase({ code, username, password, displayName 
     role: invite.role,
     storeId: invite.role === 'owner' ? '' : invite.storeId || '',
     storeName: invite.role === 'owner' ? '' : invite.storeName || '',
-    displayName: displayName || cleanUsername,
+    displayName: displayName || lineProfile?.displayName || cleanUsername,
     isActive: true,
     ...linePatch,
     createdAt: now,
