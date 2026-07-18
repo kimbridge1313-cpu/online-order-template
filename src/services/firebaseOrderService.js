@@ -9,6 +9,10 @@ function cleanOrder(order) {
   return JSON.parse(JSON.stringify(order || {}))
 }
 
+function sortByCreatedAtDesc(orders = []) {
+  return [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+}
+
 function defaultPaymentStatus(payload = {}) {
   if (payload.paymentStatus) return payload.paymentStatus
   return payload.source === 'counter' ? 'paid' : 'unpaid'
@@ -36,11 +40,11 @@ export const firebaseOrderService = {
     const db = assertFirestoreReady()
     const snapshot = await getDocs(query(
       collection(db, COLLECTION),
-      where('source', '==', 'customer_online'),
-      where('customer.lineUserId', '==', cleanLineUserId),
-      orderBy('createdAt', 'desc')
+      where('customer.lineUserId', '==', cleanLineUserId)
     ))
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+    const orders = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+      .filter((order) => order.source === 'customer_online')
+    return sortByCreatedAtDesc(orders)
   },
 
   async createOrder(payload) {
