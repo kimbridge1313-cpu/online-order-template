@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Pencil, XCircle } from 'lucide-react'
+import { MessageCircle, Pencil, XCircle } from 'lucide-react'
 import OrderEditModal from '../components/OrderEditModal'
 import StatusBadge from '../components/StatusBadge'
 import { orderService } from '../services/orderService'
+import { liffService } from '../services/liffService'
+import { env } from '../config/env'
 import { readStorage } from '../utils/storage'
 import { formatPrice } from '../utils/price'
 
-const CUSTOMER_PROFILE_KEY = 'online-order-template-customer-profile'
 const MOCK_ROLE_KEY = 'online-order-template-role'
+const MOCK_LINE_LOGIN_KEY = 'online-order-template-line-login'
 
 const tabs = [
   { value: 'all', label: '全部' },
@@ -28,6 +30,11 @@ const paymentMethodOptions = [
 ]
 const paymentMethodLabels = paymentMethodOptions.reduce((acc, item) => ({ ...acc, [item.value]: item.label }), {})
 
+function getMockLineProfile() {
+  if (!env.useMockData || !readStorage(MOCK_LINE_LOGIN_KEY, false)) return null
+  return { userId: 'mock-line-user-id', displayName: 'LINE 模擬顧客', pictureUrl: '' }
+}
+
 function getPaymentStatus(order) {
   return order.paymentStatus || 'unpaid'
 }
@@ -35,7 +42,8 @@ function getPaymentStatus(order) {
 export default function OrderManagementPage({ role: roleProp }) {
   const role = roleProp || readStorage(MOCK_ROLE_KEY, 'customer')
   const isStore = role === 'store' || role === 'owner'
-  const customerProfile = readStorage(CUSTOMER_PROFILE_KEY, { name: '', phone: '' })
+  const [lineProfile, setLineProfile] = useState(() => getMockLineProfile() || liffService.getCachedProfile())
+  const [lineChecking, setLineChecking] = useState(false)
   const [orders, setOrders] = useState([])
   const [tab, setTab] = useState('all')
   const [status, setStatus] = useState('all')
@@ -43,25 +51,83 @@ export default function OrderManagementPage({ role: roleProp }) {
   const [expandedOrderId, setExpandedOrderId] = useState(null)
   const [editingOrder, setEditingOrder] = useState(null)
   const [collectingOrder, setCollectingOrder] = useState(null)
+  const [message, setMessage] = useState('')
 
-  async function loadOrders() {
-    setOrders(await orderService.listOrders())
+  async function connectLineProfile() {
+    setMessage('')
+    setLineChecking(true)
+    try {
+      if (env.useMockData) {
+        const mockProfile = { userId: 'mock-line-user-id', displayName: 'LINE 模擬顧客', pictureUrl: '' }
+        setLineProfile(mockProfile)
+        return mockProfile
+      }
+      if (!env.isLiffEnabled) {
+        setMessage('尚未設定 LIFF ID，無法查詢個人訂單。')
+        return null
+      }
+      const profileData = await liffService.getProfile({ requireLogin: true })
+      if (profileData?.userId) setLineProfile(profileData)
+      return profileData
+    } catch (error) {
+      setMessage(error.message || 'LINE 授權失敗，請重新開啟此頁。')
+      return null
+    } finally {
+      setLineChecking(false)
+    }
   }
 
-  useEffect(() => { loadOrders() }, [])
+  async function loadOrders(profile = lineProfile) {
+    setMessage('')
+    if (isStore) {
+      setOrders(await orderService.listOrders())
+      return
+    }
+    const lineUserId = profile?.userId || ''
+    if (!lineUserId) {
+      setOrders([])
+      return
+    }
+    setOrders(await orderService.listCustomerOrders(lineUserId))
+  }
+
+  useEffect(() => {
+    let mounted = true
+    async function initialLoad() {
+      if (isStore) {
+        await loadOrders()
+        return
+      }
+      if (lineProfile?.userId) {
+        await loadOrders(lineProfile)
+        return
+      }
+      if (!env.useMockData && env.isLiffEnabled) {
+        setLineChecking(true)
+        try {
+          const profileData = await liffService.getProfile({ requireLogin: false })
+          if (!mounted) return
+          if (profileData?.userId) {
+            setLineProfile(profileData)
+            setOrders(await orderService.listCustomerOrders(profileData.userId))
+          }
+        } catch (error) {
+          if (mounted) setMessage(error.message || '目前無法確認 LINE 身份。')
+        } finally {
+          if (mounted) setLineChecking(false)
+        }
+      }
+    }
+    initialLoad()
+    return () => { mounted = false }
+  }, [isStore])
 
   const filtered = useMemo(() => orders.filter((order) => {
-    const sameOwner = isStore || (
-      order.source === 'customer_online' && (
-        order.customer?.lineUserId === 'mock-line-user-id' ||
-        (customerProfile.phone && order.customer?.phone === customerProfile.phone)
-      )
-    )
     const sameType = tab === 'all' || order.diningType === tab
     const sameStatus = status === 'all' || order.status === status
     const sameDate = !date || order.createdAt?.slice(0, 10) === date
-    return sameOwner && sameType && sameStatus && sameDate
-  }), [orders, tab, status, date, isStore, customerProfile.phone])
+    return sameType && sameStatus && sameDate
+  }), [orders, tab, status, date])
 
   async function acceptOrder(orderId) {
     if (!isStore) return
@@ -79,6 +145,7 @@ export default function OrderManagementPage({ role: roleProp }) {
   async function cancelOrder(orderId, byCustomer = false) {
     const order = orders.find((item) => item.id === orderId)
     if (!order) return
+    if (!isStore && order.customer?.lineUserId !== lineProfile?.userId) return window.alert('這不是你的訂單，無法操作。')
     if (byCustomer && !customerCancellableStatuses.includes(order.status)) return window.alert('此訂單目前狀態不可取消，請聯絡門店。')
     const reason = byCustomer ? '顧客取消訂單' : window.prompt('取消原因（可留空）') || ''
     await orderService.cancelOrder(orderId, reason)
@@ -92,12 +159,30 @@ export default function OrderManagementPage({ role: roleProp }) {
     await loadOrders()
   }
 
+  if (!isStore && !lineProfile?.userId) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-10">
+        <section className="card border-accent/30 bg-green-50/80 p-7 text-center">
+          <MessageCircle className="mx-auto text-accent" size={52} />
+          <h1 className="mt-4 text-3xl font-black">查看我的訂單</h1>
+          <p className="mt-3 text-sm leading-6 text-muted">為了保護訂單資料，請先使用 LINE 授權。系統只會查詢與你 LINE 身份相同的訂單，不會顯示其他客人的訂單。</p>
+          {message && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
+          <button className="btn-primary mt-6 w-full" type="button" onClick={async () => { const profile = await connectLineProfile(); if (profile?.userId) await loadOrders(profile) }} disabled={lineChecking || (!env.useMockData && !env.isLiffEnabled)}>
+            {lineChecking ? '正在確認 LINE 身份...' : '使用 LINE 查看我的訂單'}
+          </button>
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
       <section className="card p-5">
         <p className="text-xs font-semibold text-accent">{isStore ? 'Order Management' : 'My Orders'}</p>
         <h1 className="mt-1 text-3xl font-black">{isStore ? '訂單管理頁' : '我的訂單'}</h1>
         {!isStore && <p className="mt-2 text-sm text-muted">這裡只會顯示你自己的線上訂單。待接單或已接收訂單可自行取消。</p>}
+        {!isStore && lineProfile?.userId && <p className="mt-3 rounded-2xl bg-green-50 p-3 text-sm font-semibold text-green-700">LINE 已確認：{lineProfile.displayName || '顧客'}</p>}
+        {message && <p className="mt-3 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{message}</p>}
         <div className="mt-5 grid gap-3 md:grid-cols-[1fr_220px_220px]">
           <div className="grid grid-cols-4 gap-2 rounded-3xl bg-cream p-2">
             {tabs.map((item) => (
